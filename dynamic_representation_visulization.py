@@ -42,12 +42,6 @@ class meta_sm_Env(gym.Env):
         self.initial_moving_joints_angle = np.asarray(
             [3 / np.pi * init_q[idx] for idx in self.joint_moving_idx])
 
-        self.robot_type = [[3, 6],
-                           [0, 3, 6, 9],
-                           [0, 3, 4, 6, 7, 9, ],
-                           [0, 1, 3, 4, 6, 7, 9, 10],
-                           [0, 1, 3, 4, 5, 6, 7, 8, 9, 10],
-                           [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]]
 
         self.noise_para = noise_para
         self.action_space = gym.spaces.Box(low=-np.ones(16, dtype=np.float32), high=np.ones(16, dtype=np.float32))
@@ -157,7 +151,7 @@ class meta_sm_Env(gym.Env):
         return abort_flag
 
 def replay_robot_awareness(robot_name, robot_path, action_data, pred_urdf_code_list):
-    data_path = robot_path[:robot_path.rindex('/')+1]
+    data_path = data_root+robot_path[:robot_path.rindex('/')+1]
     initial_joints_angle = np.loadtxt(data_path + "%s.txt" % robot_name)
     initial_joints_angle = initial_joints_angle[0] if len(
         initial_joints_angle.shape) == 2 else initial_joints_angle
@@ -166,7 +160,6 @@ def replay_robot_awareness(robot_name, robot_path, action_data, pred_urdf_code_l
                              0.5, 0.5,
                              0.6, 0.6,
                              0.2, 0.2, 0.2, 0.2, 0.2, 0.2])
-    # para = np.loadtxt(data_path + "para_mode0_diffenv_test.csv")
 
     render_flag = True
     env = meta_sm_Env(initial_joints_angle, render_flag, para_space,
@@ -217,10 +210,10 @@ def replay_robot_awareness(robot_name, robot_path, action_data, pred_urdf_code_l
 
 if __name__ == '__main__':
     render = True
-    if render:
-        p.connect(p.GUI)
-    else:
-        p.connect(p.DIRECT)
+    p.connect(p.GUI) if render else p.connect(p.DIRECT)
+
+
+    data_root = '/home/ubuntu/Documents/data_4_meta_self_modeling_id/'
     p.configureDebugVisualizer(p.COV_ENABLE_GUI, 0)
     robot_name, robot_path, action_data, pred_urdf_code_list = pickle.load(open('aware_robots/11_9_9_2_10_10_7_6_14_2_5_6_13_3_3_10.pkl', 'rb'))
     replay_robot_awareness(robot_name, robot_path, action_data, pred_urdf_code_list)
