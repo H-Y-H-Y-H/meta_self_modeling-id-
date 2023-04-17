@@ -11,7 +11,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader
 from torch.nn.utils.rnn import pad_sequence, pack_padded_sequence, pad_packed_sequence
-from meta_sm.model import *
+from model import *
 
 RAND_SEED = 42
 torch.manual_seed(RAND_SEED)
@@ -102,8 +102,8 @@ class SASFDataset(Dataset):
         return dynamics_torch, leg_index_torch, joint_angle_torch, steps_torch, length_torch
 
 
-def main():
-    log_dir = os.path.join("log_dynamic_varying_sample_size")
+def train():
+    log_dir = "log_dynamic_varying_sample_size"
     os.makedirs(log_dir, exist_ok=True)
 
     use_wandb = True
@@ -418,4 +418,4 @@ def main():
 
 if __name__ == '__main__':
     # wandb.agent('vcw5rra5', function=main, count=5)
-    main()
+    train()
