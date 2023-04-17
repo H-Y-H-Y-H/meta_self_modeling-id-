@@ -1,4 +1,16 @@
 
+
+
+
+
+
+
+
+if __name__ == "__main__":
+
+
+    # Data collection
+    mode = 0
     # Run a single robot
     if mode == 0:
         taskID = 9
