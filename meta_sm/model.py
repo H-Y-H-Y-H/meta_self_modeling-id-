@@ -63,6 +63,8 @@ class MLSTMfcn(nn.Module):
 
         self.global_feat_dim = self.conv3_nf + self.num_lstm_out
 
+        self.output_size = self.global_feat_dim
+
     def forward(self, x, length):
         # x: batch x seq_len x channels
         packed_x = pack_padded_sequence(x, length.cpu().numpy(), batch_first=True)
@@ -82,28 +84,28 @@ class MLSTMfcn(nn.Module):
 
 
 class MLP_sign_reader(nn.Module):
-    def __init__(self, num_features,
+    def __init__(self, input_size,output_size,
                  num_lstm_out=256, num_lstm_layers=2,
                  conv1_nf=256, conv2_nf=512, conv3_nf=256,
                  lstm_drop_p=0, fc_drop_p=0):
         super(MLP_sign_reader, self).__init__()
 
-        input_size = 101*28  # 300 * ( 6+10+6)
-        self.num_features = num_features
-        self.global_feat_dim = input_size
+        # self.num_features = num_features
+        self.output_size = output_size
 
-        self.l1 = nn.Linear(input_size, 4096)
-        self.l2 = nn.Linear(4096, 1024)
-        self.l3 = nn.Linear(1024, 512)
+        self.l1 = nn.Linear(input_size, 2048)
+        self.l2 = nn.Linear(2048, 1024)
+        self.l3 = nn.Linear(1024, output_size)
         # self.l4 = nn.Linear(1024, 512)
 
-        self.activate = nn.Tanh()
+        self.activate = nn.ReLU()
 
     def forward(self, sign, length):
         # S size: 18, A size =
+        sign = torch.flatten(sign, start_dim=1)
         x = self.activate(self.l1(sign))
         x = self.activate(self.l2(x))
-        x = self.activate(self.l3(x))
+        x = self.l3(x)
         # x = self.activate(self.l4(x))
         # x_sa = torch.cat([s, a], -1)
 
@@ -113,13 +115,20 @@ class MLP_sign_reader(nn.Module):
         return x
 
 class PredConf(nn.Module):
-    def __init__(self,state_dim, num_class=30, num_joint=12, do=0., mlp_hidden_dim=256):
+    def __init__(self,state_dim, encoder_type,MLSTM_hidden_dim, num_class=30, num_joint=12, do=0., mlp_hidden_dim=256):
         super(PredConf, self).__init__()
-
-        self.signature_encode = MLSTMfcn(state_dim)
+        if encoder_type == 0:
+            self.signature_encode = MLSTMfcn(state_dim,
+                                             num_lstm_out=MLSTM_hidden_dim,
+                                             num_lstm_layers=2,
+                                             conv1_nf=MLSTM_hidden_dim,
+                                             conv2_nf=MLSTM_hidden_dim*2,
+                                             conv3_nf=MLSTM_hidden_dim,)
+        else:
+            self.signature_encode = MLP_sign_reader(201*28,512)
 
         self.pred_mlp = nn.Sequential(
-            nn.Linear(self.signature_encode.global_feat_dim, mlp_hidden_dim),
+            nn.Linear(self.signature_encode.output_size, mlp_hidden_dim),
             nn.Dropout(p=do),
             nn.BatchNorm1d(mlp_hidden_dim),
             nn.ReLU(),

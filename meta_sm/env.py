@@ -205,7 +205,7 @@ def call_max_reward_action(train_data, test_data):
 
 
 data_root = "/home/ubuntu/Documents/data_4_meta_self_modeling_id/data/"
-URDF_PTH = data_root + "URDF_data/"
+URDF_PTH = data_root + "robot_urdf_210k/"
 
 if __name__ == "__main__":
 
@@ -226,15 +226,15 @@ if __name__ == "__main__":
         save_flg = True
         add_sans = 0
 
-        taskID = 34
+        taskID = 29
         print('Task:', taskID)
-        num_robots_per_task = 1000
+        num_robots_per_task = 7000
         # n_log_sub_state = 16
 
         Train = True
         p.connect(p.DIRECT) if Train else p.connect(p.GUI)
         # p.connect(p.GUI)
-        robot_list = open("../data/robot_names35k.txt").read().strip().split('\n')
+        robot_list = open("../data/robot_names210k.txt").read().strip().split('\n')
         para_config = np.loadtxt('../data/para_config.csv')
         # skip_list = os.listdir(data_root + "robot_sign_data")
 
@@ -292,6 +292,7 @@ if __name__ == "__main__":
 
                     rewards = []
                     if done_time >= done_time_killer:
+                        done_times_log.append(done_time_killer)
                         break
                     for i in range(num_population):
                         step_times += 1
@@ -344,8 +345,8 @@ if __name__ == "__main__":
 
 
             if Train:
-                np.savetxt('../data/done_logger/done_logger35kto260k_%d.csv' % taskID, np.asarray(done_times_log),fmt="%i")
-                np.savetxt('../data/robot_f_name/robot_name_list_%d.txt'%taskID, np.asarray(filtered_robot_list), fmt= '%s')
+                np.savetxt('../data/done_logger/done_logger210k_%d.csv' % taskID, np.asarray(done_times_log),fmt="%i")
+                np.savetxt('../data/robot_f_name/robot_name_210k_%d.txt'%taskID, np.asarray(filtered_robot_list), fmt= '%s')
             else:
                 np.savetxt('../meta_data/test_logger35k_%d.csv' % taskID, np.asarray(all_robot_test))
 

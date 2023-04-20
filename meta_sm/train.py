@@ -76,7 +76,7 @@ class SASFDataset(Dataset):
 
     def load_data(self, robot_paths,sign_size):
         for robot_name in tqdm(self.robot_names, desc="Loading Data"):
-            dynamic_data = np.loadtxt(robot_paths[robot_name]+'/sans_100.csv').astype(dtype=np.float32)
+            dynamic_data = np.loadtxt(robot_paths[robot_name]+'/sans_%d_0.csv'%(self.max_sample_size-1)).astype(dtype=np.float32)
             self.robot2dynamic[robot_name] = dynamic_data[:sign_size]
 
             # dynamic_steps = dynamic_data[..., 1:].reshape(-1, 18, 16, 6).transpose(1, 0, 2, 3).reshape(18, -1, 16)
@@ -114,7 +114,7 @@ class SASFDataset(Dataset):
 
 def train():
     dataset_root = '/home/ubuntu/Documents/data_4_meta_self_modeling_id/'
-    log_dir = "../data/logger/"
+    log_dir = "../data/logger_256/"
     os.makedirs(log_dir, exist_ok=True)
 
     use_wandb = True
@@ -125,19 +125,22 @@ def train():
         config.loss_alpha = 0.75
         config.dropout = 0
         config.mlp_hidden_dim = 256
+        config.MLSTM_hidden_dim = 256
         config.weight_decay = 1e-6
         config.max_sample_size = 201
+        config.encoder_type = 0
         max_sample_size = config.max_sample_size
     else:
         max_sample_size = 201
 
-    num_epochs = 1000
+    num_epochs = 10000
     batch_size = 32
     use_gpu = True
-    torch_device = "cuda:1"
+    torch_device = "cuda:0"
     num_worker = 5
     sign_size = 201
     # early_stop_interval = 500
+    # n_dataset = 1000
 
     # learning_rate = wandb.config.learning_rate if use_wandb else 0.003
     # loss_alpha = wandb.config.loss_alpha if use_wandb else 0.75
@@ -147,11 +150,10 @@ def train():
     # weight_decay = wandb.config.weight_decay if use_wandb else 0
     # pred_joint_type = wandb.config.pred_joint_type if use_wandb else 0
 
-    robot_names = []
     robot_paths = dict()
-    robot_names = open('../data/filtered_17011_from35k_200steps.txt').read().strip().split('\n')
+    robot_names = open('../data/f_robot_names35k.txt').read().strip().split('\n')
     for rn in robot_names:
-        rp = dataset_root + 'data/robot_sign_data/%s'%rn
+        rp = dataset_root + 'data/robot_sign_data_2/%s'%rn
         robot_paths[rn] = rp
 
     unique_leg_count = unique_leg_conf_idx(robot_names)
@@ -186,7 +188,7 @@ def train():
     valid_loader = DataLoader(valid_dataset, batch_size=batch_size, shuffle=False, num_workers=num_worker, collate_fn=valid_dataset.collate)
 
     # Setup model
-    model = PredConf(state_dim=28, do=config.dropout, mlp_hidden_dim=config.mlp_hidden_dim)
+    model = PredConf(state_dim=28, do=config.dropout,MLSTM_hidden_dim=config.MLSTM_hidden_dim, mlp_hidden_dim=config.mlp_hidden_dim, encoder_type = config.encoder_type)
     num_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     print('Number of parameters: %d' % num_params)
 
@@ -367,7 +369,7 @@ def train():
         # Computing Early Stopping
         if valid_avg_joint_acc >= best_valid_avg_joint_acc:
             best_valid_avg_joint_acc = valid_avg_joint_acc
-            if epoch > 100:
+            if epoch > 500:
                 model_name = f"epoch{epoch+1}-acc{valid_avg_joint_acc:.4f}"
                 torch.save(model.state_dict(), os.path.join(log_dir, model_name))
             # early_stop_offset = 0
@@ -409,7 +411,7 @@ def train():
 
         if use_wandb:
             wandb.log({
-                # 'epoch': epoch + 1,
+                'epoch': epoch + 1,
                 'train_loss': train_loss_avg[-1],
                 'valid_loss': valid_loss_avg[-1],
                 'train_leg_loss': train_leg_loss_avg[-1],
