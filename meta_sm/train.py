@@ -43,7 +43,7 @@ def joint_range(tag, robot_names):
 
 
 class SASFDataset(Dataset):
-    def __init__(self, robot_paths, robot_names, leg2idx,sign_size, max_sample_size,all_sign_flag):
+    def __init__(self, robot_paths, robot_names, leg2idx, sign_size, max_sample_size, all_sign_flag,torch_device):
         super(SASFDataset, self).__init__()
         self.max_sample_size = max_sample_size
         self.robot_names = robot_names
@@ -51,16 +51,15 @@ class SASFDataset(Dataset):
         self.leg2idx = leg2idx
         self.robot_leg_conf = dict()
         self.robot_joint_conf = dict()
-        self.load_data(robot_paths,sign_size)
+        self.load_data(robot_paths, sign_size)
         self.all_sign_loaded = all_sign_flag
-
+        self.device = torch_device
     def __len__(self):
         return len(self.robot_names)
 
     def __getitem__(self, index):
         robot_name = self.robot_names[index]
         robot_dynamic = self.robot2dynamic[robot_name]
-
         if self.all_sign_loaded:
             sampled_robot_dynamics = robot_dynamic
             sample_size = len(robot_dynamic)
@@ -72,11 +71,17 @@ class SASFDataset(Dataset):
 
         leg_conf_index = self.leg2idx[self.robot_leg_conf[robot_name]]
         joint_angle_conf = self.robot_joint_conf[robot_name]
+
+        # sampled_robot_dynamics = torch.from_numpy(sampled_robot_dynamics).to(self.device)
+        # leg_conf_index = torch.from_numpy(leg_conf_index).to(self.device)
+        # joint_angle_conf = torch.from_numpy(joint_angle_conf).to(self.device)
+
         return sampled_robot_dynamics, leg_conf_index, joint_angle_conf, sample_size
 
-    def load_data(self, robot_paths,sign_size):
+    def load_data(self, robot_paths, sign_size):
         for robot_name in tqdm(self.robot_names, desc="Loading Data"):
-            dynamic_data = np.loadtxt(robot_paths[robot_name]+'/sans_%d_0.csv'%(self.max_sample_size-1)).astype(dtype=np.float32)
+            dynamic_data = np.loadtxt(robot_paths[robot_name] + '/sans_%d_0.csv' % (self.max_sample_size - 1)).astype(
+                dtype=np.float32)
             self.robot2dynamic[robot_name] = dynamic_data[:sign_size]
 
             # dynamic_steps = dynamic_data[..., 1:].reshape(-1, 18, 16, 6).transpose(1, 0, 2, 3).reshape(18, -1, 16)
@@ -109,34 +114,45 @@ class SASFDataset(Dataset):
         joint_angle_torch = torch.vstack(joint_angle_list)
         steps_torch = torch.hstack(steps_list)
         length_torch = torch.hstack(length_list)
+
         return dynamics_torch, leg_index_torch, joint_angle_torch, steps_torch, length_torch
 
 
 def train():
     dataset_root = '/home/ubuntu/Documents/data_4_meta_self_modeling_id/'
-    log_dir = "../data/logger_256/"
-    os.makedirs(log_dir, exist_ok=True)
+
+    pretrained_flag = False
+    # pretrained = '../data/logger_128k/epoch566-acc0.3402'
+    # pretrained = '../data/logger_128k_0.250000_1024_2/epoch131-acc0.3332'
+    pretrained = '../data/logger_128k_256_2/epoch54-acc0.4815'
 
     use_wandb = True
-    if use_wandb:
-        wandb.init(project="meta_encoder", entity="robotics")
-        config = wandb.config
-        config.learning_rate = 0.01
-        config.loss_alpha = 0.75
-        config.dropout = 0
-        config.mlp_hidden_dim = 256
-        config.MLSTM_hidden_dim = 256
-        config.weight_decay = 1e-6
-        config.max_sample_size = 201
-        config.encoder_type = 0
-        max_sample_size = config.max_sample_size
-    else:
-        max_sample_size = 201
+
+    wandb.init(project="meta_id", entity="robotics")  #,, mode="disabled"
+    config = wandb.config
+    config.learning_rate = 0.001
+    config.loss_alpha = 0.25
+    config.dropout = 0.05
+    config.mlp_hidden_dim = 256
+    config.MLSTM_hidden_dim = 256
+    config.weight_decay = 1e-6
+    config.max_sample_size = 201
+    config.encoder_type = 0
+    max_sample_size = config.max_sample_size
+    config.task = 2
+    running_name = wandb.run.name
+
+    log_dir = "../data/logger_%s/"%(running_name)
+    config.log_dir = log_dir
+    config.pre_trained = pretrained_flag
+    os.makedirs(log_dir, exist_ok=True)
+
 
     num_epochs = 10000
-    batch_size = 32
-    use_gpu = True
-    torch_device = "cuda:0"
+    batch_size = 8
+    torch_device = "cuda:1"
+    # torch_device = "cpu"
+
     num_worker = 5
     sign_size = 201
     # early_stop_interval = 500
@@ -151,15 +167,17 @@ def train():
     # pred_joint_type = wandb.config.pred_joint_type if use_wandb else 0
 
     robot_paths = dict()
-    robot_names = open('../data/f_robot_names35k.txt').read().strip().split('\n')
+    robot_names = open('../data/f_robot_names128295.txt').read().strip().split('\n')#[:1000]
     for rn in robot_names:
-        rp = dataset_root + 'data/robot_sign_data_2/%s'%rn
+        rp = dataset_root + 'data/robot_sign_data_2/%s' % rn
         robot_paths[rn] = rp
 
     unique_leg_count = unique_leg_conf_idx(robot_names)
     # joint_range('All joint', robot_names)
 
     idx2leg = list(unique_leg_count.keys())
+    np.savetxt('../data/leg_labels.csv', np.asarray(idx2leg), fmt="%i")
+
     leg2idx = {leg: idx for idx, leg in enumerate(idx2leg)}
 
     shuffle(robot_names)
@@ -181,256 +199,185 @@ def train():
     print("Num of Train Robots:", len(train_robot_names))
     print("Num of Valid Robots:", len(valid_robot_names))
 
-    train_dataset = SASFDataset(robot_paths, train_robot_names, leg2idx,sign_size = sign_size, max_sample_size=max_sample_size,all_sign_flag=True)
-    valid_dataset = SASFDataset(robot_paths, valid_robot_names, leg2idx,sign_size = sign_size, max_sample_size=max_sample_size,all_sign_flag=True)
+    train_dataset = SASFDataset(robot_paths, train_robot_names, leg2idx, sign_size=sign_size,
+                                max_sample_size=max_sample_size, all_sign_flag=True,torch_device=torch_device)
+    valid_dataset = SASFDataset(robot_paths, valid_robot_names, leg2idx, sign_size=sign_size,
+                                max_sample_size=max_sample_size, all_sign_flag=True,torch_device=torch_device)
 
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=num_worker, collate_fn=train_dataset.collate)
-    valid_loader = DataLoader(valid_dataset, batch_size=batch_size, shuffle=False, num_workers=num_worker, collate_fn=valid_dataset.collate)
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True,
+                              num_workers=num_worker)  # , collate_fn=train_dataset.collate
+    valid_loader = DataLoader(valid_dataset, batch_size=batch_size, shuffle=False,
+                              num_workers=num_worker)  # , collate_fn=valid_dataset.collate
 
     # Setup model
-    model = PredConf(state_dim=28, do=config.dropout,MLSTM_hidden_dim=config.MLSTM_hidden_dim, mlp_hidden_dim=config.mlp_hidden_dim, encoder_type = config.encoder_type)
+    model = PredConf(state_dim=28,
+                     do=config.dropout,
+                     MLSTM_hidden_dim=config.MLSTM_hidden_dim,
+                     mlp_hidden_dim=config.mlp_hidden_dim,
+                     encoder_type=config.encoder_type,
+                     single_objective=config.task,
+                     device=torch_device)
+
+    if pretrained_flag == True:
+        pretrained_model_dict = torch.load(pretrained)
+        model_dict = model.state_dict()
+        partial_state_dict = {k: v for k, v in pretrained_model_dict.items() if k in model_dict}
+        model_dict.update(partial_state_dict)
+        model.load_state_dict(model_dict)
+
     num_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     print('Number of parameters: %d' % num_params)
 
-    device = torch.device(torch_device if use_gpu and torch.cuda.is_available() else "cpu")
-    model = model.to(device)
+    model = model.to(torch_device)
+    criterion1 = nn.CrossEntropyLoss()
+    criterion2 = nn.CrossEntropyLoss()
 
     optimizer = torch.optim.Adam(params=model.parameters(), lr=config.learning_rate, weight_decay=config.weight_decay)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer,factor=0.1,patience=20,verbose=True)
 
-    # Training
-    train_loss_avg = [0]
-    valid_loss_avg = [0]
-    train_leg_loss_avg = [0]
-    valid_leg_loss_avg = [0]
-    valid_joint_loss_avg = [0]
-    train_joint_loss_avg = [0]
-
-    best_valid_avg_joint_acc = 0
-    early_stop_offset = 0
+    best_valid_acc = 0
 
     for epoch in range(num_epochs):
-        model.train()
-        train_num_batches = 0
-        train_leg_ground_truth = []
-        train_joint_conf_ground_truth = []
-        train_joint_conf_pred = []
-        train_leg_pred_label = []
-        train_steps = []
+        train_running_loss = 0.0
+        train_running_joint_loss = 0.0
+        train_running_leg_loss = 0.0
+
+        train_correct_leg = 0.0
+        train_correct_joint = 0.0
+        train_joint_sample_num = 0.0
+        train_leg_sample_num = 0.0
+
+        train_b_num = 0
         for batch in tqdm(train_loader, desc="Training"):
-            memory, leg_conf_id, joint_conf, steps, length = batch
-            # memory: batch x length x channels
-            train_leg_ground_truth.extend(list(leg_conf_id.numpy()))
-            train_joint_conf_ground_truth.append(joint_conf.detach().cpu().numpy())
-            train_steps.extend(list(steps.numpy()))
+            model.train()
 
-            memory = memory.to(device)
-            leg_conf_id = leg_conf_id.to(device)
-            joint_conf = joint_conf.to(device)
-
-            leg_logit, pred_joint_confs = model(memory, length)
-            leg_loss = F.cross_entropy(leg_logit, leg_conf_id)
-
-            joint_losses = []
-            for j in range(6):
-                pred_joint_logit = pred_joint_confs[j]
-                joint_label = joint_conf[:, j]
-                joint_losses.append(F.cross_entropy(pred_joint_logit, joint_label))
-
-            loss = config.loss_alpha * (sum(joint_losses) / 6) + (1 - config.loss_alpha) * leg_loss
-
-            # loss = loss_alpha * leg_loss + (1 - loss_alpha) * joint_loss
-            # loss = leg_loss + joint_loss
-
-            with torch.no_grad():
-                train_leg_pred_label.extend(list(torch.argmax(leg_logit, dim=1).detach().cpu().numpy()))
-                train_joint_conf_pred.append(np.hstack([torch.argmax(pred_joint_confs[i], dim=1).detach().cpu().numpy()[:, None] for i in range(6)]))
+            # memory, leg_conf_id, joint_conf, steps, length = batch
+            memory, gt_leg_cfg, gt_joint_cfg, length = batch
+            memory = memory.to(torch_device)
+            gt_leg_cfg = gt_leg_cfg.to(torch_device)
+            gt_joint_cfg = gt_joint_cfg.to(torch_device)
 
             optimizer.zero_grad()
+
+            # memory: batch x length x channels
+            pred_leg_cfg, pred_joint_cfg = model(memory, length)
+
+            leg_loss = criterion1(pred_leg_cfg, gt_leg_cfg)
+            pred_joint_cfg = torch.cat(pred_joint_cfg)
+            gt_joint_cfg = gt_joint_cfg.T.flatten()
+            joint_loss = criterion2(pred_joint_cfg, gt_joint_cfg)
+
+            loss = (config.loss_alpha * leg_loss + (1 - config.loss_alpha) * joint_loss)
+
             loss.backward()
             optimizer.step()
 
-            train_leg_loss_avg[-1] += leg_loss.item()
-            train_loss_avg[-1] += loss.item()
-            train_joint_loss_avg[-1] += (sum(joint_losses) / 6).item()
-            train_num_batches += 1
+            train_running_leg_loss   += leg_loss.item()
+            train_running_joint_loss += joint_loss.item()
+            train_running_loss       += loss.item()
 
+            pred_leg_cfg_id = torch.argmax(pred_leg_cfg, dim=1)
+            pred_joint_cfg_id = torch.argmax(pred_joint_cfg, dim=1)
+            train_correct_leg += (pred_leg_cfg_id == gt_leg_cfg).sum().item()
+            train_correct_joint += (pred_joint_cfg_id == gt_joint_cfg).sum().item()
+            train_joint_sample_num += len(gt_joint_cfg)
+            train_leg_sample_num += len(gt_leg_cfg)
+            train_b_num+=1
+
+        train_running_leg_loss   /= train_b_num
+        train_running_joint_loss /= train_b_num
+        train_running_loss       /= train_b_num
+
+        #################################################
+        valid_running_loss = 0.0
+        valid_running_joint_loss = 0.0
+        valid_running_leg_loss = 0.0
+
+        valid_correct_leg = 0.0
+        valid_correct_joint = 0.0
+        valid_joint_sample_num = 0.0
+        valid_leg_sample_num = 0.0
         model.eval()
-        val_num_batches = 0
-        leg_ground_truth = []
-        leg_pred_label = []
-        joint_conf_ground_truth = []
-        joint_conf_pred = []
-        valid_steps = []
+        valid_b_num = 0
         for batch in tqdm(valid_loader, desc="Validing"):
-            memory, leg_conf_id, joint_conf, steps, length = batch
-
-            leg_ground_truth.extend(list(leg_conf_id.numpy()))
-            joint_conf_ground_truth.append(joint_conf.detach().cpu().numpy())
-            valid_steps.extend(list(steps.numpy()))
-
-            memory = memory.to(device)
-            leg_conf_id = leg_conf_id.to(device)
-            joint_conf = joint_conf.to(device)
+            memory, gt_leg_cfg, gt_joint_cfg, length = batch
+            memory = memory.to(torch_device)
+            gt_leg_cfg = gt_leg_cfg.to(torch_device)
+            gt_joint_cfg = gt_joint_cfg.to(torch_device)
 
             with torch.no_grad():
-                leg_logit, pred_joint_confs = model(memory, length)
-                leg_loss = F.cross_entropy(leg_logit, leg_conf_id)
-                joint_losses = []
-                for j in range(6):
-                    pred_joint_logit = pred_joint_confs[j]
-                    joint_label = joint_conf[:, j]
-                    joint_losses.append(F.cross_entropy(pred_joint_logit, joint_label))
+                pred_leg_cfg, pred_joint_cfg = model(memory, length)
 
-                loss = config.loss_alpha * (sum(joint_losses) / 6) + (1 - config.loss_alpha) * leg_loss
+                leg_loss = criterion1(pred_leg_cfg, gt_leg_cfg)
+                pred_joint_cfg = torch.cat(pred_joint_cfg)
+                gt_joint_cfg = gt_joint_cfg.T.flatten()
+                # print(pred_joint_cfg.shape,gt_joint_cfg.shape)
+                joint_loss = criterion2(pred_joint_cfg, gt_joint_cfg)
+                loss = (config.loss_alpha * leg_loss + (1 - config.loss_alpha) * joint_loss)
 
-                leg_pred_label.extend(list(torch.argmax(leg_logit, dim=1).detach().cpu().numpy()))
-                joint_conf_pred.append(np.hstack([torch.argmax(pred_joint_confs[i], dim=1).detach().cpu().numpy()[:, None] for i in range(6)]))
+                valid_running_leg_loss += leg_loss.item()
+                valid_running_joint_loss += joint_loss.item()
+                valid_running_loss += loss.item()
 
-                # joint_conf_pred.extend(torch.round(pred_joint_conf).detach().cpu().numpy())
+                pred_leg_cfg_id = torch.argmax(pred_leg_cfg, dim=1)
+                pred_joint_cfg_id = torch.argmax(pred_joint_cfg, dim=1)
+                valid_correct_leg += (pred_leg_cfg_id == gt_leg_cfg).sum().item()
+                valid_correct_joint += (pred_joint_cfg_id == gt_joint_cfg).sum().item()
+                valid_joint_sample_num += len(gt_joint_cfg)
+                valid_leg_sample_num += len(gt_leg_cfg)
+            valid_b_num+=1
 
-            valid_leg_loss_avg[-1] += leg_loss.item()
-            valid_joint_loss_avg[-1] += (sum(joint_losses) / 6).item()
-            valid_loss_avg[-1] += loss.item()
-            val_num_batches += 1
+        scheduler.step(valid_running_loss)
+        train_acc = (train_correct_joint+train_correct_leg)/(train_joint_sample_num+train_leg_sample_num)
+        train_joint_acc = train_correct_joint/train_joint_sample_num
+        train_leg_acc = train_correct_leg/train_leg_sample_num
 
-        # Computing Evaluation Metrics
-        train_loss_avg[-1] /= train_num_batches
-        valid_loss_avg[-1] /= val_num_batches
-        train_leg_loss_avg[-1] /= train_num_batches
-        valid_leg_loss_avg[-1] /= val_num_batches
-        train_joint_loss_avg[-1] /= train_num_batches
-        valid_joint_loss_avg[-1] /= val_num_batches
-
-        joint_conf_ground_truth = np.vstack(joint_conf_ground_truth)
-        joint_conf_pred = np.vstack(joint_conf_pred)
-
-        train_joint_conf_ground_truth = np.vstack(train_joint_conf_ground_truth)
-        train_joint_conf_pred = np.vstack(train_joint_conf_pred)
-
-        train_leg_correct = 0
-        train_joint_correct = 0
-        train_all_correct = 0
-        train_total = train_joint_conf_ground_truth.shape[0]
-        for i in range(train_total):
-            if all(train_joint_conf_ground_truth[i, :] == train_joint_conf_pred[i, :]):
-                train_joint_correct += 1
-            if train_leg_ground_truth[i] == train_leg_pred_label[i]:
-                train_leg_correct += 1
-            if train_leg_ground_truth[i] == train_leg_pred_label[i] and all(
-                    train_joint_conf_ground_truth[i, :] == train_joint_conf_pred[i, :]):
-                train_all_correct += 1
-
-        train_total = train_joint_conf_ground_truth.shape[0]
-        train_steps_joint_part_correct = np.zeros((6, config.max_sample_size))
-        train_joint_part_correct = [0] * 6
-        for i in range(train_total):
-            for j in range(6):
-                if train_joint_conf_pred[i][j] == train_joint_conf_ground_truth[i][j]:
-                    train_joint_part_correct[j] += 1
-                    train_steps_joint_part_correct[j, train_steps[i]-1] += 1
-
-        train_leg_acc = train_leg_correct / train_total
-        train_joint_acc = train_joint_correct / train_total
-        train_overall_acc = train_all_correct / train_total
-
-        leg_correct = 0
-        joint_correct = 0
-        all_correct = 0
-        total = joint_conf_ground_truth.shape[0]
-        for i in range(total):
-            if all(joint_conf_ground_truth[i, :] == joint_conf_pred[i, :]):
-                joint_correct += 1
-            if leg_ground_truth[i] == leg_pred_label[i]:
-                leg_correct += 1
-            if leg_ground_truth[i] == leg_pred_label[i] and all(joint_conf_ground_truth[i, :] == joint_conf_pred[i, :]):
-                all_correct += 1
-
-        joint_part_correct = [0] * 6
-        valid_steps_joint_part_correct = np.zeros((6, config.max_sample_size))
-        for i in range(total):
-            for j in range(6):
-                if joint_conf_pred[i][j] == joint_conf_ground_truth[i][j]:
-                    joint_part_correct[j] += 1
-                    valid_steps_joint_part_correct[j, valid_steps[i]-1] += 1
-
-        valid_leg_acc = leg_correct / total
-        valid_joint_acc = joint_correct / total
-        valid_overall_acc = all_correct / total
-
-        train_avg_joint_acc = sum(train_joint_part_correct[j] / train_total for j in range(6)) / 6
-        valid_avg_joint_acc = sum(joint_part_correct[j] / total for j in range(6)) / 6
-
-        train_steps_count = [train_steps.count(i) for i in range(1, config.max_sample_size + 1)]
-        valid_steps_count = [valid_steps.count(i) for i in range(1, config.max_sample_size + 1)]
-
-        train_steps_joint_part_correct_sum = train_steps_joint_part_correct.sum(axis=0)
-        valid_steps_joint_part_correct_sum = valid_steps_joint_part_correct.sum(axis=0)
+        valid_acc = (valid_correct_joint+valid_correct_leg)/(valid_joint_sample_num+valid_leg_sample_num)
+        valid_joint_acc = valid_correct_joint/valid_joint_sample_num
+        valid_leg_acc = valid_correct_leg/valid_leg_sample_num
+        valid_running_leg_loss   /= valid_b_num
+        valid_running_joint_loss /= valid_b_num
+        valid_running_loss       /= valid_b_num
 
         # Computing Early Stopping
-        if valid_avg_joint_acc >= best_valid_avg_joint_acc:
-            best_valid_avg_joint_acc = valid_avg_joint_acc
-            if epoch > 500:
-                model_name = f"epoch{epoch+1}-acc{valid_avg_joint_acc:.4f}"
+        if valid_acc >= best_valid_acc:
+            best_valid_acc = valid_acc
+            if (epoch > 10):
+                model_name = f"epoch{epoch + 1}-acc{best_valid_acc:.4f}"
                 torch.save(model.state_dict(), os.path.join(log_dir, model_name))
-            # early_stop_offset = 0
-        # else:
-            # early_stop_offset += 1
 
-        # print(
-        #     'Sample Size: %d Epoch [%d / %d] train loss: %.4f valid loss: %.4f valid leg loss: %.4f valid joint loss: %.4f train joint loss: %.4f leg acc: %.4f joint acc: %.4f overall acc: %.4f' % (
-        #         MEMORY_SAMPLE_SIZE, epoch + 1, num_epochs, train_loss_avg[-1], valid_loss_avg[-1],
-        #         valid_leg_loss_avg[-1], valid_joint_loss_avg[-1], train_joint_loss_avg[-1], leg_acc, joint_acc,
-        #         overall_acc))
-
+        current_lr = optimizer.param_groups[0]['lr']
         # Logging
-        print(f"\n[{datetime.now()}] Model Params: {num_params} Epoch [{epoch+1} / {num_epochs}] Best Valid Avg Joint Acc {best_valid_avg_joint_acc:.4f}")
-        print(f"Train Total Loss: {train_loss_avg[-1]:.4f} Leg Loss: {train_leg_loss_avg[-1]:.4f} Joint Loss: {train_joint_loss_avg[-1]:.4f} Leg Acc: {train_leg_acc:.4f} Joint Acc: {train_joint_acc:.4f} Overall Acc: {train_overall_acc:.4f} Avg Joint Acc: {train_avg_joint_acc:.3f}")
-        print(f"Valid Total Loss: {valid_loss_avg[-1]:.4f} Leg Loss: {valid_leg_loss_avg[-1]:.4f} Joint Loss: {valid_joint_loss_avg[-1]:.4f} Leg Acc: {valid_leg_acc:.4f} Joint Acc: {valid_joint_acc:.4f} Overall Acc: {valid_overall_acc:.4f} Avg Joint Acc: {valid_avg_joint_acc:.3f}")
-
-        print("Train Joints Acc", end=" ")
-        for j in range(6):
-            print(f'J{j}: {train_joint_part_correct[j] / train_total:.4f}', end=' ')
-        print()
-
-        print("Valid Joints Acc", end=" ")
-        for j in range(6):
-            print(f'J{j}: {joint_part_correct[j] / total:.4f}', end=' ')
-        print()
-
-        # print("Train Steps Acc", end=" ")
-        # for j in range(config.max_sample_size):
-        #     print(f'S{j}: {train_steps_joint_part_correct_sum[j] / train_steps_count[j]:.4f}', end=' ')
-        # print()
-        #
-        # print("Valid Steps Acc", end=" ")
-        # for j in range(config.max_sample_size):
-        #     print(f'S{j}: {valid_steps_joint_part_correct_sum[j] / valid_steps_count[j]:.4f}', end=' ')
-        # print('\n')
-
+        print(
+            f"\n[{datetime.now()}] Model Params: {num_params} Epoch [{epoch + 1} / {num_epochs}] Best Valid Avg Joint Acc {best_valid_acc:.4f}")
+        print(
+            f"Train Total Loss: {train_running_loss:.4f} Leg Loss: {train_running_leg_loss:.4f} Joint Loss: {train_running_joint_loss:.4f} Leg Acc: {train_leg_acc:.4f} Joint Acc: {train_joint_acc:.4f} Overall Acc: {train_acc:.4f}")
+        print(
+            f"Valid Total Loss: {valid_running_loss:.4f} Leg Loss: {valid_running_leg_loss:.4f} Joint Loss: {valid_running_joint_loss:.4f} Leg Acc: {valid_leg_acc:.4f} Joint Acc: {valid_joint_acc:.4f} Overall Acc: {valid_acc:.4f}")
 
 
         if use_wandb:
             wandb.log({
                 'epoch': epoch + 1,
-                'train_loss': train_loss_avg[-1],
-                'valid_loss': valid_loss_avg[-1],
-                'train_leg_loss': train_leg_loss_avg[-1],
-                'valid_leg_loss': valid_leg_loss_avg[-1],
-                'train_joint_loss': train_joint_loss_avg[-1],
-                'valid_joint_loss': valid_joint_loss_avg[-1],
+                'train_loss': train_running_loss,
+                'valid_loss': valid_running_loss,
+                'train_leg_loss': train_running_leg_loss,
+                'valid_leg_loss': valid_running_leg_loss,
+                'train_joint_loss': train_running_joint_loss,
+                'valid_joint_loss': valid_running_joint_loss,
                 'train_leg_acc': train_leg_acc,
                 'valid_leg_acc': valid_leg_acc,
                 'train_joint_acc': train_joint_acc,
                 'valid_joint_acc': valid_joint_acc,
-                'train_overall_acc': train_overall_acc,
-                'valid_overall_acc': valid_overall_acc,
-                'train_avg_joint_acc': train_avg_joint_acc,
-                'valid_avg_joint_acc': valid_avg_joint_acc,
-                'best_valid_avg_joint_acc': best_valid_avg_joint_acc
+                'train_overall_acc': train_acc,
+                'valid_overall_acc': valid_acc,
+                'best_valid_avg_joint_acc': best_valid_acc,
+                'learning_rate': current_lr
             })
 
         # if early_stop_offset == early_stop_interval:
         #     break
+
 
 if __name__ == '__main__':
     # wandb.agent('vcw5rra5', function=main, count=5)

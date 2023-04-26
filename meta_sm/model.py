@@ -4,6 +4,7 @@ import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader
 from torch.nn.utils.rnn import pad_sequence, pack_padded_sequence, pad_packed_sequence
 
+
 class SELayer(nn.Module):
     def __init__(self, channel, reduction=16):
         super(SELayer, self).__init__()
@@ -84,7 +85,7 @@ class MLSTMfcn(nn.Module):
 
 
 class MLP_sign_reader(nn.Module):
-    def __init__(self, input_size,output_size,
+    def __init__(self, input_size, output_size,
                  num_lstm_out=256, num_lstm_layers=2,
                  conv1_nf=256, conv2_nf=512, conv3_nf=256,
                  lstm_drop_p=0, fc_drop_p=0):
@@ -93,19 +94,31 @@ class MLP_sign_reader(nn.Module):
         # self.num_features = num_features
         self.output_size = output_size
 
-        self.l1 = nn.Linear(input_size, 2048)
-        self.l2 = nn.Linear(2048, 1024)
-        self.l3 = nn.Linear(1024, output_size)
+        self.encoder_l1 = nn.Linear(input_size, 128)
+        self.encoder_l2 = nn.Linear(128, 128)
+        self.encoder_l3 = nn.Linear(128, 8)
+
+        self.l2 = nn.Linear(8*201, 2048)
+        self.l3 = nn.Linear(2048, output_size)
         # self.l4 = nn.Linear(1024, 512)
 
+        self.dropout = nn.Dropout(p=fc_drop_p)
         self.activate = nn.ReLU()
 
     def forward(self, sign, length):
         # S size: 18, A size =
-        sign = torch.flatten(sign, start_dim=1)
-        x = self.activate(self.l1(sign))
-        x = self.activate(self.l2(x))
+        x = self.activate(self.encoder_l1(sign))
+        x = self.dropout(x)
+        x = self.activate(self.encoder_l2(x))
+        x = self.activate(self.encoder_l3(x))
+
+        x = torch.flatten(x, start_dim=1)
+        x = self.dropout(x)
+
+        x = self.l2(x)
+        x = self.activate(x)
         x = self.l3(x)
+
         # x = self.activate(self.l4(x))
         # x_sa = torch.cat([s, a], -1)
 
@@ -114,32 +127,66 @@ class MLP_sign_reader(nn.Module):
 
         return x
 
+
 class PredConf(nn.Module):
-    def __init__(self,state_dim, encoder_type,MLSTM_hidden_dim, num_class=30, num_joint=12, do=0., mlp_hidden_dim=256):
+    def __init__(self, state_dim, encoder_type,
+                 MLSTM_hidden_dim, single_objective=0,
+                 num_class=30, num_joint=12,
+                 do=0., mlp_hidden_dim=256,
+                 device='cuda:1'):
         super(PredConf, self).__init__()
-        if encoder_type == 0:
+
+        self.device = device
+
+        if encoder_type == 1:
+            self.signature_encode = MLP_sign_reader(28, 512,fc_drop_p=do)
+            self.pred_mlp = nn.Sequential(
+                nn.Linear(self.signature_encode.output_size, mlp_hidden_dim),
+                nn.Dropout(p=do),
+                #nn.BatchNorm1d(mlp_hidden_dim),
+                nn.ReLU(),
+                nn.Linear(mlp_hidden_dim, mlp_hidden_dim),
+                nn.Dropout(p=do),
+                #nn.BatchNorm1d(mlp_hidden_dim),
+                nn.ReLU(),
+            )
+        else:
             self.signature_encode = MLSTMfcn(state_dim,
                                              num_lstm_out=MLSTM_hidden_dim,
                                              num_lstm_layers=2,
                                              conv1_nf=MLSTM_hidden_dim,
-                                             conv2_nf=MLSTM_hidden_dim*2,
-                                             conv3_nf=MLSTM_hidden_dim,)
-        else:
-            self.signature_encode = MLP_sign_reader(201*28,512)
+                                             conv2_nf=MLSTM_hidden_dim * 2,
+                                             conv3_nf=MLSTM_hidden_dim, )
 
-        self.pred_mlp = nn.Sequential(
-            nn.Linear(self.signature_encode.output_size, mlp_hidden_dim),
-            nn.Dropout(p=do),
-            nn.BatchNorm1d(mlp_hidden_dim),
-            nn.ReLU(),
-            nn.Linear(mlp_hidden_dim, mlp_hidden_dim),
-            nn.Dropout(p=do),
-            nn.BatchNorm1d(mlp_hidden_dim),
-            nn.ReLU(),
-        )
+            self.pred_mlp = nn.Sequential(
+                nn.Linear(self.signature_encode.output_size, mlp_hidden_dim),
+                nn.Dropout(p=do),
+                nn.BatchNorm1d(mlp_hidden_dim),
+                nn.ReLU(),
+                nn.Linear(mlp_hidden_dim, mlp_hidden_dim),
+                nn.Dropout(p=do),
+                nn.BatchNorm1d(mlp_hidden_dim),
+                nn.ReLU(),
+            )
+
+        self.single_objective = single_objective
         self.pred_leg_head = nn.Linear(mlp_hidden_dim, num_class)
+        self.pred_leg_head_0 = nn.Linear(mlp_hidden_dim, mlp_hidden_dim // 4)
+        self.pred_leg_head_1 = nn.Linear(mlp_hidden_dim // 4, num_class)
+
+        pred_joint_sequential_mlp = nn.Sequential(
+            nn.Linear(mlp_hidden_dim , mlp_hidden_dim//4),
+            nn.Dropout(p=do),
+            nn.ReLU(),
+            nn.Linear(mlp_hidden_dim//4, num_joint),
+            nn.Dropout(p=do),
+            nn.ReLU(),
+
+        )
+        self.pred_joint_heads_seq = nn.ModuleList([pred_joint_sequential_mlp for _ in range(6)])
         self.pred_joint_heads = nn.ModuleList([nn.Linear(mlp_hidden_dim, num_joint) for i in range(6)])
 
+        self.relu = nn.ReLU()
 
     def get_latent(self, memory, length):
         x = self.signature_encode(memory, length)
@@ -149,9 +196,44 @@ class PredConf(nn.Module):
     def forward(self, memory, length):
         x = self.signature_encode(memory, length)
         latent = self.pred_mlp(x)
-        pred_leg_logit = self.pred_leg_head(latent)
-        pred_joint_logits = [self.pred_joint_heads[i](latent) for i in range(6)]
-        return pred_leg_logit, pred_joint_logits
 
+        pred_joint_logits = []
+
+        if self.single_objective == 1:
+            # Only optimize the leg
+            pred_leg_logit = self.pred_leg_head(latent)
+            pred_joint_logits = [torch.rand((pred_leg_logit.shape[0], 12)).to(self.device)] * 6
+
+        elif self.single_objective == 0:
+            #  optimize the leg and joints
+            pred_leg_logit = self.pred_leg_head(latent)
+
+            for i in range(6):
+                x = self.pred_joint_heads[i](latent)
+                pred_joint_logits.append(x)
+
+        elif self.single_objective == 2:
+            #  optimize the leg and joints
+            x = self.relu(self.pred_leg_head_0(latent))
+            pred_leg_logit = self.pred_leg_head_1(x)
+
+            for i in range(6):
+                x = self.pred_joint_heads[i](latent)
+                pred_joint_logits.append(x)
+
+        elif self.single_objective == 3:
+            #  optimize the leg and joints
+            x = self.relu(self.pred_leg_head_0(latent))
+            pred_leg_logit = self.pred_leg_head_1(x)
+
+            for i in range(6):
+                x = self.pred_joint_heads_seq[i](latent)
+                pred_joint_logits.append(x)
+
+        #
+        # elif self.single_objective == 2:
+        #     # only predict the joints:
+
+        return pred_leg_logit, pred_joint_logits
 
 
