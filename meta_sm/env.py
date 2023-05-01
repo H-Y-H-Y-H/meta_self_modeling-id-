@@ -91,32 +91,25 @@ class meta_sm_Env(gym.Env):
 
         return self.obs
 
-    def act(self, sin_para):
+    def act(self, a):
 
-        # range 1 to step_num +1 so that the robot can achieve the original pos after current action.
-        for sub_step in range(1, self.sub_step_num+1):
-            a_add = sin_move(sub_step, sin_para)
-            a = self.initial_moving_joints_angle + a_add
-            a = np.clip(a, -1, 1)
-            a *= self.motor_action_space
+        for j in range(12):
+            pos_value = a[j]
+            p.setJointMotorControl2(self.robotid, self.joint_moving_idx[j], controlMode=self.mode,
+                                    targetPosition=pos_value,
+                                    force=self.force,
+                                    maxVelocity=self.maxVelocity)
 
-            for j in range(12):
-                pos_value = a[j]
-                p.setJointMotorControl2(self.robotid, self.joint_moving_idx[j], controlMode=self.mode,
-                                        targetPosition=pos_value,
-                                        force=self.force,
-                                        maxVelocity=self.maxVelocity)
+        for _ in range(self.n_sim_steps):
+            p.stepSimulation()
 
-            for _ in range(self.n_sim_steps):
-                p.stepSimulation()
-
-                # if self.render:
-                #     # Capture Camera
-                #     if self.camera_capture == True:
-                #         basePos, baseOrn = p.getBasePositionAndOrientation(self.robotid)  # Get model position
-                #         basePos_list = [basePos[0], basePos[1], 0.3]
-                #         p.resetDebugVisualizerCamera(cameraDistance=1, cameraYaw=75, cameraPitch=-20,
-                #                                      cameraTargetPosition=basePos_list)  # fix camera onto model
+            # if self.render:
+            #     # Capture Camera
+            #     if self.camera_capture == True:
+            #         basePos, baseOrn = p.getBasePositionAndOrientation(self.robotid)  # Get model position
+            #         basePos_list = [basePos[0], basePos[1], 0.3]
+            #         p.resetDebugVisualizerCamera(cameraDistance=1, cameraYaw=75, cameraPitch=-20,
+            #                                      cameraTargetPosition=basePos_list)  # fix camera onto model
             # time.sleep(self.sleep_time)
             # self.log_sub_state.append(self.get_obs())
 
@@ -164,17 +157,27 @@ class meta_sm_Env(gym.Env):
 
         return self.get_obs()
 
-    def step(self, a):
+    def step(self, sin_para):
 
-        self.act(a)
-        obs = self.get_obs()
-
-        r = 3 * obs[1] - abs(obs[5]) - 0.5 * abs(obs[0]) + 1
-        Done = self.check()
+        step_action_list = []
+        step_obs_list = []
+        r = 0
+        # range 1 to step_num +1 so that the robot can achieve the original pos after current action.
+        for a_i in range(1, self.sub_step_num + 1):
+            a_i_add = sin_move(a_i, sin_para)
+            norm_a = self.initial_moving_joints_angle + a_i_add
+            norm_a = np.clip(norm_a, -1, 1)
+            a = norm_a * self.motor_action_space
+            self.act(a)
+            step_obs = self.get_obs()
+            step_obs_list.append(step_obs)
+            step_action_list.append(norm_a)  # from -1 to 1
+            r += (3 * step_obs[1] - abs(step_obs[5]) - 0.5 * abs(step_obs[0]) + 1)
+        step_done = self.check()
 
         self.count += 1
-
-        return obs, r, Done, {}
+        obs_combine = np.hstack((step_action_list, step_obs_list))
+        return obs_combine, r, step_done, {}
 
     def robot_location(self):
         position, orientation = p.getBasePositionAndOrientation(self.robotid)
@@ -186,7 +189,7 @@ class meta_sm_Env(gym.Env):
         pos, ori = self.robot_location()
         # if abs(pos[0]) > 0.5:
         #     abort_flag = True
-        if abs(ori[0]) > np.pi / 6 or abs(ori[1]) > np.pi / 6: # or abs(ori[2]) > np.pi / 6:
+        if (abs(ori[0]) > np.pi / 6) or (abs(ori[1]) > np.pi / 6):  # or abs(ori[2]) > np.pi / 6:
             abort_flag = True
         # elif pos[1] < -0.04:
         #     abort_flag = True
@@ -205,6 +208,7 @@ def call_max_reward_action(train_data, test_data):
 
 
 data_root = "/home/ubuntu/Documents/data_4_meta_self_modeling_id/data/"
+data_save_root = "/home/ubuntu/Documents/data_4_meta_self_modeling_id/data_V2/"
 URDF_PTH = data_root + "robot_urdf_210k/"
 
 if __name__ == "__main__":
@@ -215,12 +219,12 @@ if __name__ == "__main__":
     if mode == -1:
         unfinished = []
         for i in range(35):
-            done_logger = np.loadtxt('../data/done_logger35k_%d.csv'%i)
+            done_logger = np.loadtxt('../data/done_logger35k_%d.csv' % i)
             if len(done_logger) != 1000:
                 unfinished.append(i)
-        print(unfinished,len(unfinished))
+        print(unfinished, len(unfinished))
 
-# [1, 2, 3, 4, 9, 11, 13, 14, 15, 16, 17, 22, 30, 31, 32, 34]
+    # [1, 2, 3, 4, 9, 11, 13, 14, 15, 16, 17, 22, 30, 31, 32, 34]
     if mode == 0:
 
         save_flg = True
@@ -240,29 +244,40 @@ if __name__ == "__main__":
 
         initial_para = para_config[:, 0]
         para_range = para_config[:, 1:]
-        done_times_log = []
+        done_times_log = list(np.loadtxt('../data/done_logger/done_logger210k_%d.csv'%taskID))
         all_robot_test = []
-        filtered_robot_list = []
+        filtered_robot_list = list(np.loadtxt('../data/name_filter/f_robot_name_210k_%d.txt'%taskID,dtype=str))
 
-        for robotid in range(taskID*num_robots_per_task, (taskID+1)*num_robots_per_task):
+        for robotid in range(taskID * num_robots_per_task + len(done_times_log), (taskID + 1) * num_robots_per_task):
 
             robot_name = robot_list[robotid]
             print(robotid, robot_name)
+            log_pth = data_save_root + "robot_sign_data_2/%s/" % robot_name
+            try:
+                check_files = os.listdir(log_pth)
+
+                if len(check_files)==2:
+                    print('exist')
+                    done_times_log.append(0)
+                    continue
+            except:
+                keepgoing = 0
 
             initial_joints_angle = np.loadtxt(URDF_PTH + "%s/%s.txt" % (robot_name, robot_name))
-            initial_joints_angle = initial_joints_angle[0] if len(initial_joints_angle.shape) == 2 else initial_joints_angle
+            initial_joints_angle = initial_joints_angle[0] if len(
+                initial_joints_angle.shape) == 2 else initial_joints_angle
 
             # Gait parameters and sans data path:
-            log_pth = data_root + "robot_sign_data_2/%s/" %robot_name
 
             # use previous gait to achieve more gait.
             if add_sans != 0:
                 initial_para = np.loadtxt(log_pth + "gait_step100.csv")
 
             if Train:
-                meta_env = meta_sm_Env(initial_joints_angle, urdf_path=URDF_PTH + "%s/%s.urdf" % (robot_name, robot_name))
+                meta_env = meta_sm_Env(initial_joints_angle,
+                                       urdf_path=URDF_PTH + "%s/%s.urdf" % (robot_name, robot_name))
 
-                max_train_step = 200
+                max_train_step = 100
                 meta_env.sleep_time = 0
                 try:
                     obs = meta_env.reset()
@@ -272,23 +287,25 @@ if __name__ == "__main__":
                     continue
                 step_times = 0
                 r_record = -np.inf
-                SANS_data = [np.hstack((initial_para, obs))]
+                ANS_data = []  # size = 12 + 6 + 12 initial np.hstack((initial_joints_angle, obs))
                 save_action = []
                 done_time = 0
-                done_time_killer = 5
-                num_population = 10
+                done_time_killer = 1
+                num_population = 5
                 loop_action = np.copy(initial_para)
                 mu = 0.8
                 while 1:
                     # tunning 80%
-                    loop_action_array = np.repeat([loop_action],int(num_population*mu),axis=0)
+                    loop_action_array = np.repeat([loop_action], int(num_population * mu), axis=0)
                     # keep one of previous best one
                     loop_action_array[:-1] = np.random.normal(loop_action_array[:-1], scale=0.1)
                     # random_new 20%
-                    norm_space = np.random.sample((int(num_population-mu*num_population), len(initial_para)))
-                    action_list_append = norm_space * (para_range[:, 1]-para_range[:, 0]) + np.repeat([para_range[:, 0]],
-                                                                                               int(num_population-mu*num_population),axis=0)
-                    action_list = np.vstack((loop_action_array,action_list_append))
+                    norm_space = np.random.sample((int(num_population - mu * num_population), len(initial_para)))
+                    action_list_append = norm_space * (para_range[:, 1] - para_range[:, 0]) + np.repeat(
+                        [para_range[:, 0]],
+                        int(num_population - mu * num_population), axis=0)
+                    # All individuals actions
+                    action_list = np.vstack((loop_action_array, action_list_append))
 
                     rewards = []
                     if done_time >= done_time_killer:
@@ -297,10 +314,10 @@ if __name__ == "__main__":
                     for i in range(num_population):
                         step_times += 1
                         action = action_list[i]
-                        next_obs, r, done, _ = meta_env.step(action)
-                        sans = np.hstack((action, next_obs))
-                        SANS_data.append(sans)
-                        obs = next_obs
+                        action_and_next_obs, r, done, _ = meta_env.step(action)
+                        if step_times <= max_train_step:
+                            ANS_data.append(action_and_next_obs)
+                        obs = action_and_next_obs[-18:]
                         rewards.append(r)
 
                         if done:
@@ -319,15 +336,18 @@ if __name__ == "__main__":
                         break
 
                 print("step count:", step_times, "r:", r_record)
-                if save_flg and (done_time<done_time_killer):
+                if save_flg and (done_time < done_time_killer):
                     os.makedirs(log_pth, exist_ok=True)
                     np.savetxt(log_pth + "gait_step%d_%d.csv" % (max_train_step, add_sans), np.asarray(save_action))
                     done_times_log.append(done_time)
-                    np.savetxt(log_pth + "sans_%d_%d.csv" % (max_train_step, add_sans), np.asarray(SANS_data))
+                    ANS_data = np.asarray(ANS_data)
+                    print(ANS_data.shape)
+                    np.save(log_pth + "sans_%d_%d_V2.npy" % (max_train_step, add_sans),ANS_data)
                     filtered_robot_list.append(robot_name)
 
             else:
-                meta_env = meta_sm_Env(initial_joints_angle, urdf_path=URDF_PTH + "%s/%s.urdf" % (robot_name, robot_name))
+                meta_env = meta_sm_Env(initial_joints_angle,
+                                       urdf_path=URDF_PTH + "%s/%s.urdf" % (robot_name, robot_name))
                 action = np.loadtxt(log_pth + '/gait_step300.csv')
 
                 meta_env.sleep_time = 0
@@ -343,10 +363,10 @@ if __name__ == "__main__":
                             break
                     all_robot_test.append(r_log)
 
-
             if Train:
-                np.savetxt('../data/done_logger/done_logger210k_%d.csv' % taskID, np.asarray(done_times_log),fmt="%i")
-                np.savetxt('../data/robot_f_name/robot_name_210k_%d.txt'%taskID, np.asarray(filtered_robot_list), fmt= '%s')
+                np.savetxt('../data/done_logger/done_logger210k_%d.csv' % taskID, np.asarray(done_times_log), fmt="%i")
+                np.savetxt('../data/name_filter/f_robot_name_210k_%d.txt' % taskID, np.asarray(filtered_robot_list),
+                           fmt='%s')
             else:
                 np.savetxt('../meta_data/test_logger35k_%d.csv' % taskID, np.asarray(all_robot_test))
 

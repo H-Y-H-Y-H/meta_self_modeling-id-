@@ -2,7 +2,7 @@ import os
 import random
 from random import shuffle
 from datetime import datetime
-
+from pos_encoder import *
 import wandb
 import torch
 import numpy as np
@@ -43,7 +43,7 @@ def joint_range(tag, robot_names):
 
 
 class SASFDataset(Dataset):
-    def __init__(self, robot_paths, robot_names, leg2idx, sign_size, max_sample_size, all_sign_flag,torch_device):
+    def __init__(self, data_pth, robot_names, leg2idx, sign_size, max_sample_size, all_sign_flag,torch_device):
         super(SASFDataset, self).__init__()
         self.max_sample_size = max_sample_size
         self.robot_names = robot_names
@@ -51,7 +51,7 @@ class SASFDataset(Dataset):
         self.leg2idx = leg2idx
         self.robot_leg_conf = dict()
         self.robot_joint_conf = dict()
-        self.load_data(robot_paths, sign_size)
+        self.load_data(data_pth, sign_size)
         self.all_sign_loaded = all_sign_flag
         self.device = torch_device
     def __len__(self):
@@ -78,9 +78,9 @@ class SASFDataset(Dataset):
 
         return sampled_robot_dynamics, leg_conf_index, joint_angle_conf, sample_size
 
-    def load_data(self, robot_paths, sign_size):
+    def load_data(self, data_pth, sign_size):
         for robot_name in tqdm(self.robot_names, desc="Loading Data"):
-            dynamic_data = np.loadtxt(robot_paths[robot_name] + '/sans_%d_0.csv' % (self.max_sample_size - 1)).astype(
+            dynamic_data = np.loadtxt(data_pth[robot_name] + '/sans_%d_0.csv' % (self.max_sample_size - 1)).astype(
                 dtype=np.float32)
             self.robot2dynamic[robot_name] = dynamic_data[:sign_size]
 
@@ -90,6 +90,10 @@ class SASFDataset(Dataset):
             # self.robot2dynamic[robot_name] = normalized_dynamic_steps
 
             name_code = list(map(int, robot_name.split('_')))
+            if name_code[4] < name_code[0]:
+                name_code[:4], name_code[4:8] =name_code[4:8], name_code[:4]
+                name_code[8:12],name_code[12:16] = name_code[12:16] , name_code[8:12]
+
             self.robot_leg_conf[robot_name] = (name_code[0], name_code[4], name_code[8], name_code[12])
             self.robot_joint_conf[robot_name] = np.array(name_code[1:4] + name_code[5:8])
 
@@ -120,6 +124,11 @@ class SASFDataset(Dataset):
 
 def train():
     dataset_root = '/home/ubuntu/Documents/data_4_meta_self_modeling_id/'
+    data_robot_names = open('../data/f_robot_names128295.txt').read().strip().split('\n')#[:1000]
+
+
+    # robot_names = open('test_results/sota_model_logger_128k_256_2/f_robot_name56267Apr26.txt').read().strip().split('\n')#[:1000]
+    # robot_names = open('test_results/sota_model_logger_128k_256_2/f_robot_name119980Apr27.txt').read().strip().split('\n')#[:1000]
 
     pretrained_flag = False
     # pretrained = '../data/logger_128k/epoch566-acc0.3402'
@@ -128,29 +137,33 @@ def train():
 
     use_wandb = True
 
-    wandb.init(project="meta_id", entity="robotics")  #,, mode="disabled"
+    wandb.init(project="meta_id", entity="robotics",)  #, mode="disabled"
     config = wandb.config
+    config.robot_num = len(data_robot_names)
     config.learning_rate = 0.001
     config.loss_alpha = 0.25
     config.dropout = 0.05
-    config.mlp_hidden_dim = 256
-    config.MLSTM_hidden_dim = 256
+    config.mlp_hidden_dim = 1024
+    config.MLSTM_hidden_dim = 1024
     config.weight_decay = 1e-6
     config.max_sample_size = 201
     config.encoder_type = 0
     max_sample_size = config.max_sample_size
     config.task = 2
     running_name = wandb.run.name
+    config.batch_size = 8
+    config.pos_encoder = True
+    config.torch_device = "cuda:0"
 
     log_dir = "../data/logger_%s/"%(running_name)
     config.log_dir = log_dir
     config.pre_trained = pretrained_flag
     os.makedirs(log_dir, exist_ok=True)
-
+    PosEnc = PositionalEncoder(d_input=28, n_freqs=5)
 
     num_epochs = 10000
-    batch_size = 8
-    torch_device = "cuda:1"
+
+
     # torch_device = "cpu"
 
     num_worker = 5
@@ -167,31 +180,32 @@ def train():
     # pred_joint_type = wandb.config.pred_joint_type if use_wandb else 0
 
     robot_paths = dict()
-    robot_names = open('../data/f_robot_names128295.txt').read().strip().split('\n')#[:1000]
-    for rn in robot_names:
+    for rn in data_robot_names:
         rp = dataset_root + 'data/robot_sign_data_2/%s' % rn
         robot_paths[rn] = rp
 
-    unique_leg_count = unique_leg_conf_idx(robot_names)
+    # unique_leg_count = unique_leg_conf_idx(label_robot_names)
     # joint_range('All joint', robot_names)
 
-    idx2leg = list(unique_leg_count.keys())
-    np.savetxt('../data/leg_labels.csv', np.asarray(idx2leg), fmt="%i")
+    # idx2leg = list(unique_leg_count.keys())
+    # np.savetxt('../data/leg_labels.csv', np.asarray(idx2leg), fmt="%i")
+    # leg2idx = {leg: idx for idx, leg in enumerate(idx2leg)}
+    idx2leg = np.loadtxt('../data/leg_labels.csv')
+    leg2idx = dict()
+    for i in range(len(idx2leg)):
+        leg2idx[tuple(idx2leg[i])] = i
 
-    leg2idx = {leg: idx for idx, leg in enumerate(idx2leg)}
+    # shuffle(robot_names)
+    split_idx = int(len(data_robot_names) * 0.8)
 
-    shuffle(robot_names)
-    split_idx = int(len(robot_names) * 0.8)
-
-    train_robot_names = robot_names[:split_idx]
-    valid_robot_names = robot_names[split_idx:]
+    train_robot_names = data_robot_names[:split_idx]
+    valid_robot_names = data_robot_names[split_idx:]
     # joint_range('Train joint', robot_names)
     # joint_range('Valid joint', robot_names)
 
     train_unique_leg_count = unique_leg_conf_idx(train_robot_names)
     valid_unique_leg_count = unique_leg_conf_idx(valid_robot_names)
 
-    print("Num of unique conf:", len(unique_leg_count))
     print("Num of train unique conf:", len(train_unique_leg_count))
     print("Num of valid unique conf:", len(valid_unique_leg_count))
     # assert len(train_unique_leg_count) == len(unique_leg_count) and len(valid_unique_leg_count) == len(unique_leg_count)
@@ -200,23 +214,23 @@ def train():
     print("Num of Valid Robots:", len(valid_robot_names))
 
     train_dataset = SASFDataset(robot_paths, train_robot_names, leg2idx, sign_size=sign_size,
-                                max_sample_size=max_sample_size, all_sign_flag=True,torch_device=torch_device)
+                                max_sample_size=max_sample_size, all_sign_flag=True,torch_device=config.torch_device)
     valid_dataset = SASFDataset(robot_paths, valid_robot_names, leg2idx, sign_size=sign_size,
-                                max_sample_size=max_sample_size, all_sign_flag=True,torch_device=torch_device)
+                                max_sample_size=max_sample_size, all_sign_flag=True,torch_device=config.torch_device)
 
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True,
+    train_loader = DataLoader(train_dataset, batch_size=config.batch_size, shuffle=True,
                               num_workers=num_worker)  # , collate_fn=train_dataset.collate
-    valid_loader = DataLoader(valid_dataset, batch_size=batch_size, shuffle=False,
+    valid_loader = DataLoader(valid_dataset, batch_size=config.batch_size, shuffle=False,
                               num_workers=num_worker)  # , collate_fn=valid_dataset.collate
 
     # Setup model
-    model = PredConf(state_dim=28,
+    model = PredConf(state_dim=308,
                      do=config.dropout,
                      MLSTM_hidden_dim=config.MLSTM_hidden_dim,
                      mlp_hidden_dim=config.mlp_hidden_dim,
                      encoder_type=config.encoder_type,
                      single_objective=config.task,
-                     device=torch_device)
+                     device=config.torch_device)
 
     if pretrained_flag == True:
         pretrained_model_dict = torch.load(pretrained)
@@ -228,7 +242,7 @@ def train():
     num_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     print('Number of parameters: %d' % num_params)
 
-    model = model.to(torch_device)
+    model = model.to(config.torch_device)
     criterion1 = nn.CrossEntropyLoss()
     criterion2 = nn.CrossEntropyLoss()
 
@@ -253,9 +267,10 @@ def train():
 
             # memory, leg_conf_id, joint_conf, steps, length = batch
             memory, gt_leg_cfg, gt_joint_cfg, length = batch
-            memory = memory.to(torch_device)
-            gt_leg_cfg = gt_leg_cfg.to(torch_device)
-            gt_joint_cfg = gt_joint_cfg.to(torch_device)
+            memory = PosEnc(memory)
+            memory = memory.to(config.torch_device)
+            gt_leg_cfg = gt_leg_cfg.to(config.torch_device)
+            gt_joint_cfg = gt_joint_cfg.to(config.torch_device)
 
             optimizer.zero_grad()
 
@@ -266,8 +281,10 @@ def train():
             pred_joint_cfg = torch.cat(pred_joint_cfg)
             gt_joint_cfg = gt_joint_cfg.T.flatten()
             joint_loss = criterion2(pred_joint_cfg, gt_joint_cfg)
-
-            loss = (config.loss_alpha * leg_loss + (1 - config.loss_alpha) * joint_loss)
+            if config.loss_alpha == 2:
+                loss = leg_loss + joint_loss
+            else:
+                loss = (config.loss_alpha * leg_loss + (1 - config.loss_alpha) * joint_loss)
 
             loss.backward()
             optimizer.step()
@@ -301,9 +318,10 @@ def train():
         valid_b_num = 0
         for batch in tqdm(valid_loader, desc="Validing"):
             memory, gt_leg_cfg, gt_joint_cfg, length = batch
-            memory = memory.to(torch_device)
-            gt_leg_cfg = gt_leg_cfg.to(torch_device)
-            gt_joint_cfg = gt_joint_cfg.to(torch_device)
+            memory = PosEnc(memory)
+            memory = memory.to(config.torch_device)
+            gt_leg_cfg = gt_leg_cfg.to(config.torch_device)
+            gt_joint_cfg = gt_joint_cfg.to(config.torch_device)
 
             with torch.no_grad():
                 pred_leg_cfg, pred_joint_cfg = model(memory, length)
@@ -313,7 +331,10 @@ def train():
                 gt_joint_cfg = gt_joint_cfg.T.flatten()
                 # print(pred_joint_cfg.shape,gt_joint_cfg.shape)
                 joint_loss = criterion2(pred_joint_cfg, gt_joint_cfg)
-                loss = (config.loss_alpha * leg_loss + (1 - config.loss_alpha) * joint_loss)
+                if config.loss_alpha == 2:
+                    loss = leg_loss + joint_loss
+                else:
+                    loss = (config.loss_alpha * leg_loss + (1 - config.loss_alpha) * joint_loss)
 
                 valid_running_leg_loss += leg_loss.item()
                 valid_running_joint_loss += joint_loss.item()

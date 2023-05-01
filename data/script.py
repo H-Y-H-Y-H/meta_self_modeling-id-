@@ -114,3 +114,51 @@ def get_urdf():
 
 
 # get_urdf()
+def unique_leg_conf_idx(robot_names):
+    leg_conf_count = dict()
+    new_robot_names = []
+    for robot_name in robot_names:
+        name_code = list(map(int, robot_name.split('_')))
+        if name_code[4]<name_code[0]:
+            swap_buffer0 = np.copy(name_code[4:8])
+            swap_buffer1 = np.copy(name_code[12:16])
+            name_code[4:8] = name_code[:4]
+            name_code[12:16] = name_code[8:12]
+
+            name_code[:4] = swap_buffer0
+            name_code[8:12] = swap_buffer1
+
+
+        new_name = ''
+        for i in range(len(name_code)):
+            if i == len(name_code)-1:
+                new_name += str(name_code[i])
+            else:
+                new_name += str(name_code[i]) + '_'
+        new_robot_names.append(new_name)
+
+
+        leg_code = (name_code[0], name_code[4], name_code[8], name_code[12])
+
+        if leg_code in leg_conf_count:
+            leg_conf_count[leg_code] += 1
+        else:
+            leg_conf_count[leg_code] = 1
+    np.savetxt('Apr28_2leg_label_128295.txt',np.asarray(new_robot_names),fmt="%s")
+    return leg_conf_count
+
+# robot_names = open('f_robot_names128295.txt').read().strip().split('\n')#[:1000]
+# label = unique_leg_conf_idx(robot_names)
+# np.savetxt('leg_labels.csv', np.asarray(list(label.keys())), fmt="%i")
+#
+# print(len(label),label)
+# for i in range(10):
+
+done_list = []
+
+for i in range(30):
+    d = np.loadtxt('../data/done_logger/done_logger210k_%d.csv'%i)
+    done_list.append(d)
+
+done_list_all = np.concatenate(done_list,axis = 1)
+print(len(done_list_all))

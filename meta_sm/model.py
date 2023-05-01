@@ -183,7 +183,7 @@ class PredConf(nn.Module):
             nn.ReLU(),
 
         )
-        self.pred_joint_heads_seq = nn.ModuleList([pred_joint_sequential_mlp for _ in range(6)])
+        # self.pred_joint_heads_seq = nn.ModuleList([pred_joint_sequential_mlp for _ in range(6)])
         self.pred_joint_heads = nn.ModuleList([nn.Linear(mlp_hidden_dim, num_joint) for i in range(6)])
 
         self.relu = nn.ReLU()
