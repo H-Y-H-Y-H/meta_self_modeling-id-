@@ -230,7 +230,7 @@ if __name__ == "__main__":
         save_flg = True
         add_sans = 0
 
-        taskID = 29
+        taskID = 24
         print('Task:', taskID)
         num_robots_per_task = 7000
         # n_log_sub_state = 16

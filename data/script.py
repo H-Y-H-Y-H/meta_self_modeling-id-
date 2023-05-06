@@ -147,18 +147,47 @@ def unique_leg_conf_idx(robot_names):
     np.savetxt('Apr28_2leg_label_128295.txt',np.asarray(new_robot_names),fmt="%s")
     return leg_conf_count
 
-# robot_names = open('f_robot_names128295.txt').read().strip().split('\n')#[:1000]
-# label = unique_leg_conf_idx(robot_names)
-# np.savetxt('leg_labels.csv', np.asarray(list(label.keys())), fmt="%i")
-#
-# print(len(label),label)
-# for i in range(10):
+def get_label():
+    num_robot = 108669
+    robot_names = open('f_robot_name_%d.txt'%num_robot).read().strip().split('\n')#[:1000]
+    label = unique_leg_conf_idx(robot_names)
+    np.savetxt('leg_labels.csv', np.asarray(list(label.keys())), fmt="%i")
 
-done_list = []
+    print(len(label),label)
+# get_label()
 
-for i in range(30):
-    d = np.loadtxt('../data/done_logger/done_logger210k_%d.csv'%i)
-    done_list.append(d)
+def robot_name_combine():
+    done_list = []
 
-done_list_all = np.concatenate(done_list,axis = 1)
-print(len(done_list_all))
+    for i in range(30):
+        d = np.loadtxt('name_filter/f_robot_name_210k_%d.txt'%i,dtype=str)
+        done_list.append(d)
+
+    done_list_all = np.concatenate(done_list)
+    print(len(done_list_all))
+    np.savetxt("name_filter/f_robot_name_%d.txt"%len(done_list_all),done_list_all,fmt="%s")
+
+# robot_name_combine()
+
+def filter_robot_pkl_issue():
+    dataset_root = '/home/ubuntu/Documents/data_4_meta_self_modeling_id/data_V2/robot_sign_data_2/'
+
+    num_robots = 108669
+    name_list = np.loadtxt('name_filter/f_robot_name_%d.txt'%num_robots,dtype=str)
+    error_list = []
+    for i in range(num_robots):
+        check_pth = dataset_root + name_list[i] + '/sans_100_0_V2.npy'
+        try:
+            arr = np.load(check_pth)
+            flag = np.isnan(arr)
+            if flag.any():
+                print('NaN Detected')
+                print(i, name_list[i])
+        except:
+            # error_list.append(name_list[i])
+            print(i, name_list[i])
+            #  10_0_0_11_16_6_10_5_18_6_2_7_14_0_0_1
+            #  10_9_3_4_6_1_5_8_9_11_7_4_14_3_9_8
+        # break
+# filter_robot_pkl_issue()
+
