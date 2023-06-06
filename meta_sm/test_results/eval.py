@@ -1,14 +1,12 @@
 import numpy as np
 
 dataset_root = '/home/ubuntu/Documents/data_4_meta_self_modeling_id/'
-robot_names = open('../../data/Jun3_robot_name_141735.txt').read().strip().split('\n')
+robot_names = open('../../data/Jun6_all_urdf_name_163648.txt').read().strip().split('\n')
 robot_names = robot_names[int(0.8 * len(robot_names)):]
 
-
-model_name = 'model_autumn-surf-121'
+model_name = 'model_upbeat-valley-130'
 acc_joint = np.loadtxt(model_name+'/acc_joint.csv')
 acc_leg = np.loadtxt(model_name+'/acc_leg.csv')
-
 
 leg_right = np.where(acc_leg == 1)[0]
 joint_right = np.where(acc_joint >= 6)[0]
@@ -20,7 +18,7 @@ data_num = len(acc_joint)
 j_acc = joint_r_num/data_num
 l_acc = leg_r_num/data_num
 
-print(j_acc,l_acc)
+print(j_acc, l_acc)
 
 passed_robo = np.asarray(joint_right, dtype=np.int32)
 

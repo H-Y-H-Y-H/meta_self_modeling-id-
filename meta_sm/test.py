@@ -12,15 +12,15 @@ if __name__ == "__main__":
     api = wandb.Api()
     runs = api.runs("robotics/meta_id_dyna")
 
-    model_name = 'autumn-surf-121'
+    model_name = 'upbeat-valley-130'
     device = 'cuda:0'
-    model_path = '../data/logger_%s/epoch77-acc0.6209' % model_name
+    model_path = '../data/logger_%s/epoch2-acc0.5611' % model_name
     dataset_root = '/home/ubuntu/Documents/data_4_meta_self_modeling_id/'
 
-    # robot_names = open('../data/Jun3_robot_name_141735.txt').read().strip().split('\n')
-    # robot_names = robot_names[int(0.8*len(robot_names)):]
+    robot_names = open('../data/Jun6_all_urdf_name_163648.txt').read().strip().split('\n')
+    robot_names = robot_names[int(0.8*len(robot_names)):]
 
-    robot_names = np.loadtxt('test_results/100acc_robo_name.txt', dtype='str')[:100]
+    # robot_names = np.loadtxt('test_results/100acc_robo_name.txt', dtype='str')[:10]
 
     result_log_path = 'test_results/model_%s' % model_name
     os.makedirs(result_log_path, exist_ok=True)
@@ -134,6 +134,7 @@ if __name__ == "__main__":
 
             test_result = (pred_joint_cfg_id == gt_joint_cfg).int().view(6,-1).T # 16 x 6
             test_result = test_result.sum(dim=1).detach().cpu().numpy() # 16 x 1
+
             leg_acc_list.append(test_correct_leg)
             joint_acc_list.append(test_result)
 
@@ -154,7 +155,7 @@ if __name__ == "__main__":
 
     joint_acc_list = np.concatenate(joint_acc_list)
     leg_acc_list = np.concatenate(leg_acc_list)
-    print("results save in: ",result_log_path)
+    print("results save in: ", result_log_path)
     np.savetxt(result_log_path + '/acc_leg.csv', np.array(leg_acc_list))
     np.savetxt(result_log_path + '/acc_joint.csv', joint_acc_list)
     np.savetxt(result_log_path + '/test_robot_names.txt', test_robot_names, fmt='%s')

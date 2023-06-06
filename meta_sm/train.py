@@ -151,7 +151,7 @@ def train():
     data_robot_names = open('../data/Jun6_all_urdf_name_163648.txt').read().strip().split('\n')
 
     pretrained_flag = True
-    pretrained = '../data/logger_sunny-grass-124/epoch98-acc0.5304'
+    pretrained = '../data/logger_clean-resonance-128/epoch12-acc0.5603'
 
     use_wandb = True
 
