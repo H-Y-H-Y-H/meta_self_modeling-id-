@@ -50,8 +50,11 @@ class SASFDataset(Dataset):
                  max_sample_size,
                  all_sign_flag,
                  torch_device,
-                 choose_10steps_input):
+                 choose_10steps_input,
+                 obs_noise):
         super(SASFDataset, self).__init__()
+
+        self.obs_noise = obs_noise
         self.max_sample_size = max_sample_size
         self.robot_names = robot_names
         self.robot2dynamic = dict()
@@ -74,11 +77,20 @@ class SASFDataset(Dataset):
             sample_size = len(robot_dynamic)
 
         else:
-            # if self.choose_10steps_input:
-            random_id = random.randint(0, 9)
-            start_point, end_point = random_id*self.max_sample_size, (random_id+1)*self.max_sample_size
+            random_id = np.random.randint(0, 11 - self.max_sample_size)
+            start_point, end_point = random_id * 160, (random_id + self.max_sample_size) * 160
             sampled_robot_dynamics = robot_dynamic[start_point:end_point]
-            sample_size = 1
+            # random_id = np.random.choice(10, self.max_sample_size, replace=False)
+            # sampled_robot_dynamics = []
+            # for rand_id in range(self.max_sample_size):
+            #     r_i = random_id[rand_id]
+            #     start_point, end_point = r_i * 160, (r_i + 1) * 160
+            #     part_data = np.copy(robot_dynamic[start_point:end_point])
+            #     sampled_robot_dynamics.append(part_data)
+            # sampled_robot_dynamics = np.concatenate(sampled_robot_dynamics)
+
+            # Add noise
+            sampled_robot_dynamics[:, 12:] = np.random.normal(sampled_robot_dynamics[:, 12:], self.obs_noise)
 
             # sample_size = np.random.randint(1, self.max_sample_size + 1)
             # sample_idx = np.random.choice(robot_dynamic.shape[0], sample_size, replace=True)
@@ -87,26 +99,19 @@ class SASFDataset(Dataset):
         leg_conf_index = self.leg2idx[self.robot_leg_conf[robot_name]]
         joint_angle_conf = self.robot_joint_conf[robot_name]
 
-        # sampled_robot_dynamics = torch.from_numpy(sampled_robot_dynamics).to(self.device)
-        # leg_conf_index = torch.from_numpy(leg_conf_index).to(self.device)
-        # joint_angle_conf = torch.from_numpy(joint_angle_conf).to(self.device)
-
-        return sampled_robot_dynamics, leg_conf_index, joint_angle_conf, sample_size
+        return sampled_robot_dynamics, leg_conf_index, joint_angle_conf, self.max_sample_size
 
     def load_data(self, data_pth, sign_size):
         for robot_name in tqdm(self.robot_names, desc="Loading Data"):
+
+            # 10 step action + next state 12 + 6 + 12
             dynamic_data = np.load(data_pth[robot_name] + '/sans_%d_0_V2.npy' % (sign_size)).astype(
                 dtype=np.float32)
             dyna_shape = dynamic_data.shape
-            dynamic_data = dynamic_data.reshape((dyna_shape[0]*dyna_shape[1], dyna_shape[2]))
+            dynamic_data = dynamic_data.reshape((dyna_shape[0] * dyna_shape[1], dyna_shape[2]))
             # dynamic_data = np.flatten(dynamic_data, start_dim=1, end_dim=2)
 
-            self.robot2dynamic[robot_name] = dynamic_data # [:self.max_sample_size]
-
-            # dynamic_steps = dynamic_data[..., 1:].reshape(-1, 18, 16, 6).transpose(1, 0, 2, 3).reshape(18, -1, 16)
-            # normalized_dynamic_steps = dynamic_steps - dynamic_steps[..., 0, None]
-            # normalized_dynamic_steps = dynamic_steps
-            # self.robot2dynamic[robot_name] = normalized_dynamic_steps
+            self.robot2dynamic[robot_name] = dynamic_data  # [:self.max_sample_size]
 
             name_code = list(map(int, robot_name.split('_')))
             if name_code[4] < name_code[0]:
@@ -143,60 +148,46 @@ class SASFDataset(Dataset):
 
 def train():
     dataset_root = '/home/ubuntu/Documents/data_4_meta_self_modeling_id/'
-    data_robot_names = open('../data/f_robot_name_108669.txt').read().strip().split('\n')#[:100]
+    data_robot_names = open('../data/Jun6_all_urdf_name_163648.txt').read().strip().split('\n')
 
-    # robot_names = open('test_results/sota_model_logger_128k_256_2/f_robot_name56267Apr26.txt').read().strip().split('\n')#[:1000]
-    # robot_names = open('test_results/sota_model_logger_128k_256_2/f_robot_name119980Apr27.txt').read().strip().split('\n')#[:1000]
-
-    pretrained_flag = False
-    # pretrained = '../data/logger_128k/epoch566-acc0.3402'
-    # pretrained = '../data/logger_128k_0.250000_1024_2/epoch131-acc0.3332'
-    pretrained = '../data/logger_vital-flower-16/epoch95-acc0.4632'
+    pretrained_flag = True
+    pretrained = '../data/logger_sunny-grass-124/epoch98-acc0.5304'
 
     use_wandb = True
 
-    wandb.init(project="meta_id_dyna", entity="robotics")  #, mode="disabled"
+    wandb.init(project="meta_id_dyna", entity="robotics")  #,mode="disabled"
     config = wandb.config
     config.robot_num = len(data_robot_names)
     config.learning_rate = 0.001
     config.loss_alpha = 0.25
     config.dropout = 0.0
-    config.mlp_hidden_dim = 2048
-    config.MLSTM_hidden_dim = 2048
+    config.mlp_hidden_dim = 512
+    config.MLSTM_hidden_dim = 512
     config.weight_decay = 1e-6
-    config.max_sample_size = 16*10
+    config.max_sample_size = 1        # 16 sub steps/ step; 10 steps/epoch
     config.choose_10steps_input = True
     config.all_sign_flag = False
+    config.obs_noise = 0.01
     max_sample_size = config.max_sample_size
     config.task = 3
     running_name = wandb.run.name
-    config.batch_size = 16
+    config.batch_size = 128
     config.pos_encoder = False
     config.torch_device = "cuda:1"
 
-    log_dir = "../data/logger_%s/"%(running_name)
+    log_dir = "../data/logger_%s/" % (running_name)
     config.log_dir = log_dir
     config.pre_trained = pretrained_flag
     os.makedirs(log_dir, exist_ok=True)
-    # PosEnc = PositionalEncoder(d_input=28, n_freqs=5)
+    PosEnc = PositionalEncoder(d_input=28, n_freqs=5)
 
     num_epochs = 10000
     num_worker = 5
     sign_size = 100
-    # early_stop_interval = 500
-    # n_dataset = 1000
-
-    # learning_rate = wandb.config.learning_rate if use_wandb else 0.003
-    # loss_alpha = wandb.config.loss_alpha if use_wandb else 0.75
-    # mlp_encode_type = wandb.config.mlp_encode_type if use_wandb else 1
-    # do = wandb.config.dropout if use_wandb else 0.3
-    # mlp_hidden_dim = wandb.config.mlp_hidden_dim if use_wandb else 256
-    # weight_decay = wandb.config.weight_decay if use_wandb else 0
-    # pred_joint_type = wandb.config.pred_joint_type if use_wandb else 0
 
     robot_paths = dict()
     for rn in data_robot_names:
-        rp = dataset_root + 'data_V2/robot_sign_data_2/%s' % rn
+        rp = dataset_root + 'sign_data/%s' % rn
         robot_paths[rn] = rp
 
     # unique_leg_count = unique_leg_conf_idx(label_robot_names)
@@ -215,15 +206,12 @@ def train():
 
     train_robot_names = data_robot_names[:split_idx]
     valid_robot_names = data_robot_names[split_idx:]
-    # joint_range('Train joint', robot_names)
-    # joint_range('Valid joint', robot_names)
 
     train_unique_leg_count = unique_leg_conf_idx(train_robot_names)
     valid_unique_leg_count = unique_leg_conf_idx(valid_robot_names)
 
     print("Num of train unique conf:", len(train_unique_leg_count))
     print("Num of valid unique conf:", len(valid_unique_leg_count))
-    # assert len(train_unique_leg_count) == len(unique_leg_count) and len(valid_unique_leg_count) == len(unique_leg_count)
 
     print("Num of Train Robots:", len(train_robot_names))
     print("Num of Valid Robots:", len(valid_robot_names))
@@ -235,8 +223,8 @@ def train():
                                 max_sample_size=max_sample_size,
                                 all_sign_flag=config.all_sign_flag,
                                 torch_device=config.torch_device,
-                                choose_10steps_input=config.choose_10steps_input
-
+                                choose_10steps_input=config.choose_10steps_input,
+                                obs_noise=config.obs_noise
                                 )
     valid_dataset = SASFDataset(robot_paths,
                                 valid_robot_names,
@@ -245,7 +233,9 @@ def train():
                                 max_sample_size=max_sample_size,
                                 all_sign_flag=config.all_sign_flag,
                                 torch_device=config.torch_device,
-                                choose_10steps_input=config.choose_10steps_input)
+                                choose_10steps_input=config.choose_10steps_input,
+                                obs_noise=config.obs_noise
+                                )
 
     train_loader = DataLoader(train_dataset, batch_size=config.batch_size, shuffle=True,
                               num_workers=num_worker)  # , collate_fn=train_dataset.collate
@@ -275,7 +265,10 @@ def train():
     criterion2 = nn.CrossEntropyLoss()
 
     optimizer = torch.optim.Adam(params=model.parameters(), lr=config.learning_rate, weight_decay=config.weight_decay)
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer,factor=0.1,patience=20,verbose=True)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer,
+                                                           factor=0.1,
+                                                           patience=10,
+                                                           verbose=True)
 
     best_valid_acc = 0
 
@@ -293,16 +286,13 @@ def train():
         for batch in tqdm(train_loader, desc="Training"):
             model.train()
 
-            # memory, leg_conf_id, joint_conf, steps, length = batch
             memory, gt_leg_cfg, gt_joint_cfg, length = batch
             if config.pos_encoder:
                 memory = PosEnc(memory)
             memory = memory.to(config.torch_device)
             gt_leg_cfg = gt_leg_cfg.to(config.torch_device)
             gt_joint_cfg = gt_joint_cfg.to(config.torch_device)
-
             optimizer.zero_grad()
-
             # memory: batch x length x channels
             pred_leg_cfg, pred_joint_cfg = model(memory, length)
 
@@ -318,9 +308,9 @@ def train():
             loss.backward()
             optimizer.step()
 
-            train_running_leg_loss   += leg_loss.item()
+            train_running_leg_loss += leg_loss.item()
             train_running_joint_loss += joint_loss.item()
-            train_running_loss       += loss.item()
+            train_running_loss += loss.item()
 
             pred_leg_cfg_id = torch.argmax(pred_leg_cfg, dim=1)
             pred_joint_cfg_id = torch.argmax(pred_joint_cfg, dim=1)
@@ -328,11 +318,11 @@ def train():
             train_correct_joint += (pred_joint_cfg_id == gt_joint_cfg).sum().item()
             train_joint_sample_num += len(gt_joint_cfg)
             train_leg_sample_num += len(gt_leg_cfg)
-            train_b_num+=1
+            train_b_num += 1
 
-        train_running_leg_loss   /= train_b_num
+        train_running_leg_loss /= train_b_num
         train_running_joint_loss /= train_b_num
-        train_running_loss       /= train_b_num
+        train_running_loss /= train_b_num
 
         #################################################
         valid_running_loss = 0.0
@@ -376,26 +366,26 @@ def train():
                 valid_correct_joint += (pred_joint_cfg_id == gt_joint_cfg).sum().item()
                 valid_joint_sample_num += len(gt_joint_cfg)
                 valid_leg_sample_num += len(gt_leg_cfg)
-            valid_b_num+=1
+            valid_b_num += 1
 
         scheduler.step(valid_running_loss)
-        train_acc = (train_correct_joint+train_correct_leg)/(train_joint_sample_num+train_leg_sample_num)
-        train_joint_acc = train_correct_joint/train_joint_sample_num
-        train_leg_acc = train_correct_leg/train_leg_sample_num
+        train_acc = (train_correct_joint + train_correct_leg) / (train_joint_sample_num + train_leg_sample_num)
+        train_joint_acc = train_correct_joint / train_joint_sample_num
+        train_leg_acc = train_correct_leg / train_leg_sample_num
 
-        valid_acc = (valid_correct_joint+valid_correct_leg)/(valid_joint_sample_num+valid_leg_sample_num)
-        valid_joint_acc = valid_correct_joint/valid_joint_sample_num
-        valid_leg_acc = valid_correct_leg/valid_leg_sample_num
-        valid_running_leg_loss   /= valid_b_num
+        valid_acc = (valid_correct_joint + valid_correct_leg) / (valid_joint_sample_num + valid_leg_sample_num)
+        valid_joint_acc = valid_correct_joint / valid_joint_sample_num
+        valid_leg_acc = valid_correct_leg / valid_leg_sample_num
+        valid_running_leg_loss /= valid_b_num
         valid_running_joint_loss /= valid_b_num
-        valid_running_loss       /= valid_b_num
+        valid_running_loss /= valid_b_num
 
         # Computing Early Stopping
         if valid_acc >= best_valid_acc:
             best_valid_acc = valid_acc
-            if (epoch > 10):
-                model_name = f"epoch{epoch + 1}-acc{best_valid_acc:.4f}"
-                torch.save(model.state_dict(), os.path.join(log_dir, model_name))
+
+            model_name = f"epoch{epoch + 1}-acc{best_valid_acc:.4f}"
+            torch.save(model.state_dict(), os.path.join(log_dir, model_name))
 
         current_lr = optimizer.param_groups[0]['lr']
         # Logging
@@ -405,7 +395,6 @@ def train():
             f"Train Total Loss: {train_running_loss:.4f} Leg Loss: {train_running_leg_loss:.4f} Joint Loss: {train_running_joint_loss:.4f} Leg Acc: {train_leg_acc:.4f} Joint Acc: {train_joint_acc:.4f} Overall Acc: {train_acc:.4f}")
         print(
             f"Valid Total Loss: {valid_running_loss:.4f} Leg Loss: {valid_running_leg_loss:.4f} Joint Loss: {valid_running_joint_loss:.4f} Leg Acc: {valid_leg_acc:.4f} Joint Acc: {valid_joint_acc:.4f} Overall Acc: {valid_acc:.4f}")
-
 
         if use_wandb:
             wandb.log({

@@ -45,7 +45,7 @@ def create():
     return str
 
 
-def create_symm_notop():
+def create_symm_notop(log_path):
 
     a0 = random.sample([6, 7, 10, 11, 15, 16], 2)
     F1 = [a0[0]]
@@ -102,9 +102,10 @@ def create_symm_notop():
 
     robot_name = "%s_%s_%s_%s_%s_%s_%s_%s_%s_%s_%s_%s_%s_%s_%s_%s" % (
         F1[0], F1[1], F1[2], F1[3], F2[0], F2[1], F2[2], F2[3], F3[0], F3[1], F3[2], F3[3], F4[0], F4[1], F4[2], F4[3])
-    if robot_name in set(os.listdir('../data/robot_urdf_search')):
+    save_data_pth =log_path+'/robot_urdf_search/'
+    if robot_name in set(os.listdir(save_data_pth)):
         return None
-    cals.write_urdf(F1, F2, F3, F4)
+    cals.write_urdf(F1, F2, F3, F4, save_data_pth)
     return robot_name
 
 # for i in range(1):

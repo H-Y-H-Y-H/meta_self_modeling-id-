@@ -22,10 +22,11 @@ def create_initial_q():
 
 
 def main():
-    existing_urdf1 = set(os.listdir('../data/robot_urdf_10k'))
-    existing_urdf2 = set(os.listdir('../data/robot_urdf_40k'))
-    existing_urdf3 = set(os.listdir('../data/robot_urdf_210k'))
-    existing_urdf = existing_urdf1 | existing_urdf2 | existing_urdf3
+    data_folder = "/home/ubuntu/Documents/data_4_meta_self_modeling_id/"
+    existing_urdf = set(os.listdir(data_folder +'robot_urdf/'))
+    # existing_urdf2 = set(os.listdir('../data/robot_urdf_40k'))
+    # existing_urdf3 = set(os.listdir('../data/robot_urdf_210k'))
+    # existing_urdf = existing_urdf1 | existing_urdf2 | existing_urdf3
 
     SYMMETRY = True
     GUI4DEBUG = False
@@ -36,7 +37,7 @@ def main():
 
     NUM_INITIAL_ANGLE = 30
 
-    data_folder = '../data'
+    # data_folder = '../data'
     urdf_store_folder = 'robot_urdf_search'
 
     os.makedirs(os.path.join(data_folder, urdf_store_folder), exist_ok=True)
@@ -50,7 +51,7 @@ def main():
     for i in range(NUM_ROBOT):
         # while True:
         if SYMMETRY:
-            filename = creater.create_symm_notop()
+            filename = creater.create_symm_notop(data_folder)
         else:
             filename = creater.create()
 
@@ -71,15 +72,14 @@ def main():
             secondtest = False
             startPos = [0, 0, 1]
             startOrientation = p.getQuaternionFromEuler([0, 0, 0])
+            # print(urdf_folder)
             roboID = p.loadURDF(urdf_folder + "/%s.urdf" % filename, startPos,
                                 startOrientation, useFixedBase=1,
                                 flags=p.URDF_USE_SELF_COLLISION or p.URDF_USE_SELF_COLLISION_INCLUDE_PARENT)
 
             initial_q = create_initial_q()
-
             checkflag = True
             checkflag_ik = False
-
             for j in range(20):
                 p.setJointMotorControl2(roboID, j, p.POSITION_CONTROL,
                                         targetPosition=initial_q[j], force=2, maxVelocity=100)

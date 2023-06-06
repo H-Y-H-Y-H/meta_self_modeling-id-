@@ -68,8 +68,9 @@ class MLSTMfcn(nn.Module):
 
     def forward(self, x, length):
         # x: batch x seq_len x channels
-        packed_x = pack_padded_sequence(x, length.cpu().numpy(), batch_first=True)
-        packed_x_out, (ht, ct) = self.lstm(packed_x)
+        # packed_x = pack_padded_sequence(x, length.cpu().numpy(), batch_first=True)
+
+        packed_x_out, (ht, ct) = self.lstm(x)
         x1 = ht[-1]
 
         x2 = x.transpose(2, 1)
@@ -113,7 +114,6 @@ class PredConf(nn.Module):
         super(PredConf, self).__init__()
 
         self.device = device
-
         self.signature_encode = MLSTMfcn(state_dim,
                                          num_lstm_out=MLSTM_hidden_dim,
                                          num_lstm_layers=2,
