@@ -355,11 +355,10 @@ def train():
 
             with torch.no_grad():
                 pred_leg_cfg, pred_joint_cfg = model(memory, length)
-
                 leg_loss = criterion1(pred_leg_cfg, gt_leg_cfg)
                 pred_joint_cfg = torch.cat(pred_joint_cfg)
                 gt_joint_cfg = gt_joint_cfg.T.flatten()
-                # print(pred_joint_cfg.shape,gt_joint_cfg.shape)
+
                 joint_loss = criterion2(pred_joint_cfg, gt_joint_cfg)
                 if config.loss_alpha == 2:
                     loss = leg_loss + joint_loss
