@@ -1,9 +1,9 @@
 import numpy as np
 
 dataset_root = '/home/ubuntu/Documents/data_4_meta_self_modeling_id/'
-robot_names = open('../../data/Jun6_robot_name_181004.txt').read().strip().split('\n')
+robot_names = open('../../data/Jun6_robot_name_200115.txt').read().strip().split('\n')
 robot_names = robot_names[int(0.8 * len(robot_names)):]
-model_name = 'hearty-energy-132'
+model_name = 'model_'+'icy-flower-142'
 
 
 def acc_robot_name(model_name):
@@ -34,13 +34,13 @@ def acc_robot_name(model_name):
 
     filter_list = []
     for name in robo_exist_list:
-        if robo_exist_list.count(name) >= 8:
+        if robo_exist_list.count(name) >= 10:
             if name not in filter_list:
                 filter_list.append(name)
 
     np.savetxt('100acc_robo_name.txt', filter_list, fmt='%s')
 
-# acc_robot_name(model_name)
+acc_robot_name(model_name)
 
 def joint_pred_eval():
     all_robot = np.loadtxt(model_name+'/test_robot_names.txt',dtype='str')
@@ -73,4 +73,4 @@ def leg_pred_eval(model_name):
     print(leg_right.shape,all_robot.shape)
     print(np.mean(acc_leg),np.std(acc_leg))
 
-leg_pred_eval(model_name)
+# leg_pred_eval(model_name)

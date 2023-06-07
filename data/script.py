@@ -247,7 +247,7 @@ def get_urdf_name_list():
     # np.savetxt('all_urdf_name_%d.txt' % len(all_old_files), all_old_files, fmt="%s")
     np.savetxt('Jun6_robot_name_%d.txt'%len(all_old_files), all_old_files, fmt="%s")
 
-get_urdf_name_list()
+# get_urdf_name_list()
 
 
 def transfer_urdf_to_temp_urdf():
@@ -272,3 +272,20 @@ def transfer_urdf_to_temp_urdf():
         shutil.copyfile(src2, tgt2)
 
 # transfer_urdf_to_temp_urdf()
+
+def npydata():
+    dataset_root = '/home/ubuntu/Desktop/meta_real/data/robot_sign_data/'
+    robot_names = os.listdir(dataset_root)
+    npy1 = np.load(dataset_root+robot_names[1]+'/sans_100_0_V2.npy')
+    print(npy1.shape)
+
+    dataset_root = '/home/ubuntu/Documents/data_4_meta_self_modeling_id/'
+    robot_names = open('../data/Jun6_robot_name_200115.txt').read().strip().split('\n')
+    robot_names = robot_names[int(0.8 * len(robot_names)):]
+    rn = robot_names[0]
+    rp = dataset_root + 'sign_data/%s' % rn
+    npy2 = np.load(rp + '/sans_100_0_V2.npy')
+    print(npy2.shape)
+
+# npydata()
+

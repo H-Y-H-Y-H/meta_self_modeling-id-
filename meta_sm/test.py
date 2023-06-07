@@ -1,10 +1,12 @@
+import os
+
 import numpy as np
 
 from train import *
 
 # def get_dataset():
 
-
+real_test = False
 if __name__ == "__main__":
     import wandb
     import argparse
@@ -12,15 +14,19 @@ if __name__ == "__main__":
     api = wandb.Api()
     runs = api.runs("robotics/meta_id_dyna")
 
-    model_name = 'hearty-energy-132'
-    device = 'cuda:0'
-    model_path = '../data/logger_%s/epoch28-acc0.5938' % model_name
-    dataset_root = '/home/ubuntu/Documents/data_4_meta_self_modeling_id/'
+    model_name = 'icy-flower-142'
+    device = 'cuda:1'
+    model_path = '../data/logger_%s/epoch76-acc0.6472' % model_name
 
-    robot_names = open('../data/Jun6_robot_name_181004.txt').read().strip().split('\n')
-    robot_names = robot_names[int(0.8*len(robot_names)):]
-
-    idx_sample_flag = 1
+    if real_test:
+        dataset_root = '/home/ubuntu/Desktop/meta_real/data/robot_sign_data/'
+        robot_names = os.listdir(dataset_root)
+    else:
+        dataset_root = '/home/ubuntu/Documents/data_4_meta_self_modeling_id/'
+        robot_names = open('../data/Jun6_robot_name_200115.txt').read().strip().split('\n')
+        robot_names = robot_names[int(0.8*len(robot_names)):]
+    idx_sample_flag = 9
+    print('idx',idx_sample_flag)
     # robot_names = np.loadtxt('test_results/100acc_robo_name.txt', dtype='str')
 
     summary_list, config_list, name_list = [], [], []
@@ -37,34 +43,36 @@ if __name__ == "__main__":
     num_worker = 0
     loss_alpha = 0.25
 
-    robot_paths = dict()
-    for rn in robot_names:
-        rp = dataset_root + 'sign_data/%s' % rn
-        robot_paths[rn] = rp
-    unique_leg_count = unique_leg_conf_idx(robot_names)
-    # idx2leg = list(unique_leg_count.keys())
-    # leg2idx = {leg: idx for idx, leg in enumerate(idx2leg)}
+    if real_test:
+        robot_paths = dict()
+        for rn in robot_names:
+            rp = dataset_root + rn
+            robot_paths[rn] = rp
+    else:
+        robot_paths = dict()
+        for rn in robot_names:
+            rp = dataset_root + 'sign_data/%s' % rn
+            robot_paths[rn] = rp
+
 
     idx2leg = np.loadtxt('../data/leg_labels.csv')
     leg2idx = dict()
     for i in range(len(idx2leg)):
         leg2idx[tuple(idx2leg[i])] = i
 
-    print("Num of test unique conf:", len(unique_leg_count))
-
-    # split_idx = int(len(robot_names) * 0.8)
-    split_idx = 0
-    # train_robot_names = robot_names[:split_idx]
-    test_robot_names = robot_names[split_idx:]
-    print(len(test_robot_names), "robots will be tested")
-    # train_unique_leg_count = unique_leg_conf_idx(train_robot_names)
-    test_unique_leg_count = unique_leg_conf_idx(test_robot_names)
+    # # split_idx = int(len(robot_names) * 0.8)
+    # split_idx = 0
+    # # train_robot_names = robot_names[:split_idx]
+    # test_robot_names = robot_names[split_idx:]
+    # print(len(test_robot_names), "robots will be tested")
 
     model = PredConf(state_dim=30,
                      MLSTM_hidden_dim=config.MLSTM_hidden_dim,
                      mlp_hidden_dim=config.mlp_hidden_dim,
                      single_objective=config.task,
-                     device=device)
+                     device=device,
+                     baseline_id = config.baseline_id
+                     )
 
     model.load_state_dict(torch.load(model_path))
     model = model.to(device)
@@ -73,7 +81,7 @@ if __name__ == "__main__":
     # Data you want evaluate
 
     test_dataset = SASFDataset(robot_paths,
-                               test_robot_names,
+                               robot_names,
                                leg2idx,
                                sign_size=sign_size,
                                max_sample_size=config.max_sample_size,
@@ -81,7 +89,8 @@ if __name__ == "__main__":
                                torch_device=device,
                                choose_10steps_input=config.choose_10steps_input,
                                idx_sample_flag = idx_sample_flag,
-                               obs_noise=0.01)
+                               obs_noise=0.0,
+                               )
 
     test_loader = DataLoader(test_dataset,
                              batch_size=batch_size,
@@ -96,7 +105,7 @@ if __name__ == "__main__":
     test_correct_joint = 0.0
     test_joint_sample_num = 0.0
     test_leg_sample_num = 0.0
-    test_b_num = len(test_robot_names)
+    test_b_num = len(robot_names)
     test_joint_acc = 0
     test_leg_acc = 0
 
@@ -119,8 +128,6 @@ if __name__ == "__main__":
             leg_loss = criterion1(pred_leg_cfg, gt_leg_cfg)
             pred_joint_cfg = torch.cat(pred_joint_cfg)
             gt_joint_cfg = gt_joint_cfg.T.flatten()
-
-
 
             joint_loss = criterion2(pred_joint_cfg, gt_joint_cfg)
             loss = (loss_alpha * leg_loss + (1 - loss_alpha) * joint_loss)
@@ -168,8 +175,9 @@ if __name__ == "__main__":
     grth_numpy_list = np.concatenate(grth_numpy_list)
 
 
-
     result_log_path = 'test_results/model_%s_%d' % (model_name,idx_sample_flag)
+
+    # result_log_path = 'test_real_results/model_%s_%d' % (model_name,idx_sample_flag)
     os.makedirs(result_log_path, exist_ok=True)
 
     print("results save in: ", result_log_path)
@@ -179,7 +187,7 @@ if __name__ == "__main__":
 
     np.savetxt(result_log_path + '/acc_leg.csv', np.array(leg_acc_list))
     np.savetxt(result_log_path + '/acc_joint.csv', joint_acc_list)
-    np.savetxt(result_log_path + '/test_robot_names.txt', test_robot_names, fmt='%s')
+    np.savetxt(result_log_path + '/test_robot_names.txt', robot_names, fmt='%s')
     np.savetxt(result_log_path + '/logger.csv', np.asarray(log_data))
     print(test_running_leg_loss)
     print(test_running_joint_loss)
