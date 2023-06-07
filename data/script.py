@@ -252,7 +252,7 @@ def get_urdf_name_list():
 
 def transfer_urdf_to_temp_urdf():
 
-    robot_names = np.loadtxt('../meta_sm/test_results/100acc_robo_name.txt', dtype='str')[:30]
+    robot_names = np.loadtxt('../meta_sm/test_results/100acc_robo_name.txt', dtype='str')
 
     urdf_pth = '/home/ubuntu/Documents/data_4_meta_self_modeling_id/robot_urdf/'
     all_files = os.listdir(urdf_pth)
@@ -271,7 +271,7 @@ def transfer_urdf_to_temp_urdf():
         shutil.copyfile(src1, tgt1)
         shutil.copyfile(src2, tgt2)
 
-# transfer_urdf_to_temp_urdf()
+transfer_urdf_to_temp_urdf()
 
 def npydata():
     dataset_root = '/home/ubuntu/Desktop/meta_real/data/robot_sign_data/'
