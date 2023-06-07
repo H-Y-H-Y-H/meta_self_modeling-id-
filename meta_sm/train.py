@@ -154,17 +154,17 @@ class SASFDataset(Dataset):
 
 def train():
     dataset_root = '/home/ubuntu/Documents/data_4_meta_self_modeling_id/'
-    data_robot_names = open('../data/Jun6_robot_name_181004.txt').read().strip().split('\n')
+    data_robot_names = open('../data/Jun6_robot_name_200115.txt').read().strip().split('\n')
 
     pretrained_flag = True
-    pretrained = '../data/logger_upbeat-valley-130/epoch90-acc0.5926'
+    pretrained = '../data/logger_morning-wind-139/epoch19-acc0.4538'
 
     use_wandb = True
 
     wandb.init(project="meta_id_dyna", entity="robotics")  #,mode="disabled"
     config = wandb.config
     config.robot_num = len(data_robot_names)
-    config.learning_rate = 0.0001
+    config.learning_rate = 0.001
     config.loss_alpha = 0.25
     config.dropout = 0.0
     config.mlp_hidden_dim = 512
@@ -173,13 +173,14 @@ def train():
     config.max_sample_size = 1        # 16 sub steps/ step; 10 steps/epoch
     config.choose_10steps_input = True
     config.all_sign_flag = False
-    config.obs_noise = 0.01
+    config.obs_noise = 0.0
     max_sample_size = config.max_sample_size
     config.task = 3
     running_name = wandb.run.name
     config.batch_size = 128
     config.pos_encoder = False
-    config.torch_device = "cuda:1"
+    config.torch_device = "cuda:0"
+    config.baseline_id = 1
 
     log_dir = "../data/logger_%s/" % (running_name)
     config.log_dir = log_dir
@@ -230,7 +231,8 @@ def train():
                                 all_sign_flag=config.all_sign_flag,
                                 torch_device=config.torch_device,
                                 choose_10steps_input=config.choose_10steps_input,
-                                obs_noise=config.obs_noise
+                                obs_noise=config.obs_noise,
+                                idx_sample_flag=-1
                                 )
     valid_dataset = SASFDataset(robot_paths,
                                 valid_robot_names,
@@ -240,7 +242,8 @@ def train():
                                 all_sign_flag=config.all_sign_flag,
                                 torch_device=config.torch_device,
                                 choose_10steps_input=config.choose_10steps_input,
-                                obs_noise=config.obs_noise
+                                obs_noise=config.obs_noise,
+                                idx_sample_flag=-1
                                 )
 
     train_loader = DataLoader(train_dataset, batch_size=config.batch_size, shuffle=True,
@@ -254,7 +257,8 @@ def train():
                      MLSTM_hidden_dim=config.MLSTM_hidden_dim,
                      mlp_hidden_dim=config.mlp_hidden_dim,
                      single_objective=config.task,
-                     device=config.torch_device)
+                     device=config.torch_device,
+                     baseline_id = config.baseline_id)
 
     if pretrained_flag == True:
         pretrained_model_dict = torch.load(pretrained)
@@ -272,8 +276,8 @@ def train():
 
     optimizer = torch.optim.Adam(params=model.parameters(), lr=config.learning_rate, weight_decay=config.weight_decay)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer,
-                                                           factor=0.1,
-                                                           patience=10,
+                                                           factor=0.5,
+                                                           patience=40,
                                                            verbose=True)
 
     best_valid_acc = 0

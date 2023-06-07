@@ -209,44 +209,45 @@ def transfer_urdf_to_target():
     all_files = os.listdir(urdf_pth)
     count = 0
     for i in range(len(all_files)):
-
         ur_name = all_files[i]
         if ur_name in all_old_files:
             count += 1
-            print("FK",count)
+            print("FK", count)
         else:
-            if len(os.listdir(urdf_pth+ur_name)) ==2:
-                src1 = urdf_pth + '%s/%s.txt'%(ur_name,ur_name)
-                src2 = urdf_pth + '%s/%s.urdf'%(ur_name,ur_name)
+            if len(os.listdir(urdf_pth+ur_name)) == 2:
+                src1 = urdf_pth + '%s/%s.txt' % (ur_name,  ur_name)
+                src2 = urdf_pth + '%s/%s.urdf' % (ur_name, ur_name)
 
-                tgt1 = target_urdf_pth + '%s/%s.txt'%(ur_name,ur_name)
-                tgt2 = target_urdf_pth + '%s/%s.urdf'%(ur_name,ur_name)
-                os.makedirs(target_urdf_pth+ur_name,exist_ok=True)
+                tgt1 = target_urdf_pth + '%s/%s.txt' % (ur_name, ur_name)
+                tgt2 = target_urdf_pth + '%s/%s.urdf' % (ur_name, ur_name)
+                os.makedirs(target_urdf_pth+ur_name, exist_ok=True)
 
                 shutil.copyfile(src1, tgt1)
                 shutil.copyfile(src2, tgt2)
+
 # transfer_urdf_to_target()
 
 def get_urdf_name_list():
     target_urdf_pth = '/home/ubuntu/Documents/data_4_meta_self_modeling_id/sign_data/'
 
-    # target_urdf_pth = '/home/ubuntu/Documents/data_4_meta_self_modeling_id/urdf_data/'
+    # target_urdf_pth = '/home/ubuntu/Documents/data_4_meta_self_modeling_id/robot_urdf/'
     all_old_files = os.listdir(target_urdf_pth)
     # # np.savetxt("Jun3_robot_name_%d.txt" % len(all_old_files), all_old_files, fmt="%s")
 
-    # for i in range(len(all_old_files)):
-    #     folder_pth = target_urdf_pth + all_old_files[i]
-    #     files_in_folder = os.listdir(folder_pth)
-    #     if "sans_100_0_V2.npy" not in files_in_folder:
+    for i in range(len(all_old_files)):
+        folder_pth = target_urdf_pth + all_old_files[i]
+        files_in_folder = os.listdir(folder_pth)
+        if "sans_100_0_V2.npy" not in files_in_folder:
+            print('?????????????')
     #         file_loaded = np.load(folder_pth+"/sans_200_0_V2.npy")
     #         print(file_loaded.shape)
     #         file_new = file_loaded[:100]
     #         np.save(folder_pth+'/sans_100_0_V2.npy', file_new)
 
-    # np.savetxt('all_urdf_name_%d.txt'%len(all_old_files), all_old_files, fmt="%s")
+    # np.savetxt('all_urdf_name_%d.txt' % len(all_old_files), all_old_files, fmt="%s")
     np.savetxt('Jun6_robot_name_%d.txt'%len(all_old_files), all_old_files, fmt="%s")
 
-# get_urdf_name_list()
+get_urdf_name_list()
 
 
 def transfer_urdf_to_temp_urdf():
@@ -270,4 +271,4 @@ def transfer_urdf_to_temp_urdf():
         shutil.copyfile(src1, tgt1)
         shutil.copyfile(src2, tgt2)
 
-transfer_urdf_to_temp_urdf()
+# transfer_urdf_to_temp_urdf()

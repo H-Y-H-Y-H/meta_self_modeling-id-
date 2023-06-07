@@ -12,16 +12,16 @@ if __name__ == "__main__":
     api = wandb.Api()
     runs = api.runs("robotics/meta_id_dyna")
 
-    model_name = 'upbeat-valley-130'
+    model_name = 'hearty-energy-132'
     device = 'cuda:0'
-    model_path = '../data/logger_%s/epoch90-acc0.5926' % model_name
+    model_path = '../data/logger_%s/epoch28-acc0.5938' % model_name
     dataset_root = '/home/ubuntu/Documents/data_4_meta_self_modeling_id/'
 
-    # robot_names = open('../data/Jun6_robot_name_181004.txt').read().strip().split('\n')
-    # robot_names = robot_names[int(0.8*len(robot_names)):]
+    robot_names = open('../data/Jun6_robot_name_181004.txt').read().strip().split('\n')
+    robot_names = robot_names[int(0.8*len(robot_names)):]
 
-    idx_sample_flag = -1
-    robot_names = np.loadtxt('test_results/100acc_robo_name.txt', dtype='str')
+    idx_sample_flag = 1
+    # robot_names = np.loadtxt('test_results/100acc_robo_name.txt', dtype='str')
 
     summary_list, config_list, name_list = [], [], []
     config = None

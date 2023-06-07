@@ -27,11 +27,11 @@ class MLSTMfcn(nn.Module):
     def __init__(self, num_features,
                  num_lstm_out=256, num_lstm_layers=2,
                  conv1_nf=256, conv2_nf=512, conv3_nf=256,
-                 lstm_drop_p=0, fc_drop_p=0):
+                 lstm_drop_p=0, fc_drop_p=0,baseline_id = 0):
         super(MLSTMfcn, self).__init__()
 
         self.num_features = num_features
-
+        self.baseline_id = baseline_id
         self.num_lstm_out = num_lstm_out
         self.num_lstm_layers = num_lstm_layers
 
@@ -70,17 +70,34 @@ class MLSTMfcn(nn.Module):
         # x: batch x seq_len x channels
         # packed_x = pack_padded_sequence(x, length.cpu().numpy(), batch_first=True)
 
-        packed_x_out, (ht, ct) = self.lstm(x)
-        x1 = ht[-1]
 
-        x2 = x.transpose(2, 1)
-        x2 = self.convDrop(self.relu(self.bn1(self.conv1(x2))))
-        x2 = self.se1(x2)
-        x2 = self.convDrop(self.relu(self.bn2(self.conv2(x2))))
-        x2 = self.se2(x2)
-        x2 = self.convDrop(self.relu(self.bn3(self.conv3(x2))))
-        x2 = torch.mean(x2, 2)
-        x_all = torch.cat((x1, x2), dim=1)
+        if self.baseline_id == 0:
+            packed_x_out, (ht, ct) = self.lstm(x)
+            x1 = ht[-1]
+
+            x2 = x.transpose(2, 1)
+            x2 = self.convDrop(self.relu(self.bn1(self.conv1(x2))))
+            x2 = self.se1(x2)
+            x2 = self.convDrop(self.relu(self.bn2(self.conv2(x2))))
+            x2 = self.se2(x2)
+            x2 = self.convDrop(self.relu(self.bn3(self.conv3(x2))))
+            x2 = torch.mean(x2, 2)
+            x_all = torch.cat((x1, x2), dim=1)
+
+        elif self.baseline_id == 1:
+            x2 = x.transpose(2, 1)
+            x2 = self.convDrop(self.relu(self.bn1(self.conv1(x2))))
+            x2 = self.se1(x2)
+            x2 = self.convDrop(self.relu(self.bn2(self.conv2(x2))))
+            x2 = self.se2(x2)
+            x2 = self.convDrop(self.relu(self.bn3(self.conv3(x2))))
+            x2 = torch.mean(x2, 2)
+            x_all = torch.cat((x2, x2), dim=1)
+
+        elif self.baseline_id==2:
+            packed_x_out, (ht, ct) = self.lstm(x)
+            x1 = ht[-1]
+            x_all = torch.cat((x1, x1), dim=1)
 
         return x_all
 
@@ -110,7 +127,8 @@ class PredConf(nn.Module):
                  MLSTM_hidden_dim, single_objective=0,
                  num_class=30, num_joint=12,
                  do=0., mlp_hidden_dim=256,
-                 device='cuda:1'):
+                 device='cuda:1',
+                 baseline_id = 0):
         super(PredConf, self).__init__()
 
         self.device = device
@@ -119,7 +137,8 @@ class PredConf(nn.Module):
                                          num_lstm_layers=2,
                                          conv1_nf=MLSTM_hidden_dim,
                                          conv2_nf=MLSTM_hidden_dim * 2,
-                                         conv3_nf=MLSTM_hidden_dim, )
+                                         conv3_nf=MLSTM_hidden_dim,
+                                         baseline_id = baseline_id)
 
         self.pred_mlp = nn.Sequential(
             nn.Linear(self.signature_encode.output_size, mlp_hidden_dim),

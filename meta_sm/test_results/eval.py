@@ -3,7 +3,7 @@ import numpy as np
 dataset_root = '/home/ubuntu/Documents/data_4_meta_self_modeling_id/'
 robot_names = open('../../data/Jun6_robot_name_181004.txt').read().strip().split('\n')
 robot_names = robot_names[int(0.8 * len(robot_names)):]
-model_name = 'model_upbeat-valley-130'
+model_name = 'hearty-energy-132'
 
 
 def acc_robot_name(model_name):
@@ -65,3 +65,12 @@ def joint_pred_eval():
     print(len(all_robot))
 
 # joint_pred_eval()
+
+def leg_pred_eval(model_name):
+    acc_leg = np.loadtxt(model_name + '/acc_leg.csv' )
+    all_robot = np.loadtxt(model_name + '/test_robot_names.txt', dtype='str')
+    leg_right = np.where(acc_leg == 1)[0]
+    print(leg_right.shape,all_robot.shape)
+    print(np.mean(acc_leg),np.std(acc_leg))
+
+leg_pred_eval(model_name)
