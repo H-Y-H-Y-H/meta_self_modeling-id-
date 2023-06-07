@@ -13,7 +13,7 @@ from torch.utils.data import Dataset, DataLoader
 from torch.nn.utils.rnn import pad_sequence, pack_padded_sequence, pad_packed_sequence
 from model import *
 
-RAND_SEED = 42
+RAND_SEED = 43
 torch.manual_seed(RAND_SEED)
 np.random.seed(RAND_SEED)
 random.seed(RAND_SEED)
@@ -51,9 +51,11 @@ class SASFDataset(Dataset):
                  all_sign_flag,
                  torch_device,
                  choose_10steps_input,
+                 idx_sample_flag,
                  obs_noise):
         super(SASFDataset, self).__init__()
 
+        self.idx_sample_flag = idx_sample_flag
         self.obs_noise = obs_noise
         self.max_sample_size = max_sample_size
         self.robot_names = robot_names
@@ -77,9 +79,13 @@ class SASFDataset(Dataset):
             sample_size = len(robot_dynamic)
 
         else:
-            random_id = np.random.randint(0, 11 - self.max_sample_size)
-            start_point, end_point = random_id * 160, (random_id + self.max_sample_size) * 160
-            sampled_robot_dynamics = robot_dynamic[start_point:end_point]
+            if self.idx_sample_flag == -1:
+                random_id = np.random.randint(0, 11 - self.max_sample_size)
+                start_point, end_point = random_id * 160, (random_id + self.max_sample_size) * 160
+                sampled_robot_dynamics = robot_dynamic[start_point:end_point]
+            else:
+                sampled_robot_dynamics = robot_dynamic[self.idx_sample_flag* 160:
+                                                       (self.idx_sample_flag + self.max_sample_size)* 160]
             # random_id = np.random.choice(10, self.max_sample_size, replace=False)
             # sampled_robot_dynamics = []
             # for rand_id in range(self.max_sample_size):
@@ -148,17 +154,17 @@ class SASFDataset(Dataset):
 
 def train():
     dataset_root = '/home/ubuntu/Documents/data_4_meta_self_modeling_id/'
-    data_robot_names = open('../data/Jun6_all_urdf_name_163648.txt').read().strip().split('\n')
+    data_robot_names = open('../data/Jun6_robot_name_181004.txt').read().strip().split('\n')
 
     pretrained_flag = True
-    pretrained = '../data/logger_clean-resonance-128/epoch12-acc0.5603'
+    pretrained = '../data/logger_upbeat-valley-130/epoch90-acc0.5926'
 
     use_wandb = True
 
     wandb.init(project="meta_id_dyna", entity="robotics")  #,mode="disabled"
     config = wandb.config
     config.robot_num = len(data_robot_names)
-    config.learning_rate = 0.001
+    config.learning_rate = 0.0001
     config.loss_alpha = 0.25
     config.dropout = 0.0
     config.mlp_hidden_dim = 512

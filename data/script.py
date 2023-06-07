@@ -225,10 +225,12 @@ def transfer_urdf_to_target():
 
                 shutil.copyfile(src1, tgt1)
                 shutil.copyfile(src2, tgt2)
-
+# transfer_urdf_to_target()
 
 def get_urdf_name_list():
     target_urdf_pth = '/home/ubuntu/Documents/data_4_meta_self_modeling_id/sign_data/'
+
+    # target_urdf_pth = '/home/ubuntu/Documents/data_4_meta_self_modeling_id/urdf_data/'
     all_old_files = os.listdir(target_urdf_pth)
     # # np.savetxt("Jun3_robot_name_%d.txt" % len(all_old_files), all_old_files, fmt="%s")
 
@@ -241,7 +243,9 @@ def get_urdf_name_list():
     #         file_new = file_loaded[:100]
     #         np.save(folder_pth+'/sans_100_0_V2.npy', file_new)
 
-    # np.savetxt('Jun6_all_urdf_name_%d.txt'%len(all_old_files), all_old_files, fmt="%s")
+    # np.savetxt('all_urdf_name_%d.txt'%len(all_old_files), all_old_files, fmt="%s")
+    np.savetxt('Jun6_robot_name_%d.txt'%len(all_old_files), all_old_files, fmt="%s")
+
 # get_urdf_name_list()
 
 

@@ -217,16 +217,17 @@ if __name__ == "__main__":
 
     # [1, 2, 3, 4, 9, 11, 13, 14, 15, 16, 17, 22, 30, 31, 32, 34]
     if mode == 0:
-        save_flg = True
+        save_flg = False
         add_sans = 0
 
-        taskID = 25
+        taskID = 27
         print('Task:', taskID)
         num_robots_per_task = 10000
 
         Train = True
-        p.connect(p.DIRECT) if Train else p.connect(p.GUI)
-        robot_list = list(np.loadtxt('../data/all_urdf_name.txt', dtype=str))
+        # p.connect(p.DIRECT)
+        p.connect(p.GUI)
+        robot_list = list(np.loadtxt('../data/all_urdf_name_280345.txt', dtype=str))
         para_config = np.loadtxt('../data/para_config.csv')
 
         initial_para = para_config[:, 0]
@@ -245,19 +246,24 @@ if __name__ == "__main__":
         for robotid in range(taskID * num_robots_per_task, (taskID + 1) * num_robots_per_task):
 
             robot_name = robot_list[robotid]
+            robot_name = "11_0_2_0_10_0_9_2_14_0_3_10_13_0_10_0"
             print(robotid, robot_name)
             log_pth = data_save_root + "%s/" % robot_name
-            if robot_name in exist_sign_data:
-                print('exist!')
-                continue
-            elif robot_name not in exist_URDF:
-                print("URDF folder doesn't contain this robot name",robot_name)
-                continue
-            elif len(os.listdir(URDF_PTH + robot_name))!=2:
-                print( "robot URDF folder doesn't contain this robot txt", os.listdir(URDF_PTH+robot_name))
-                continue
 
-            initial_joints_angle = np.loadtxt(URDF_PTH + "%s/%s.txt" % (robot_name, robot_name))
+            # if robot_name in exist_sign_data:
+            #     print('exist!')
+            #     continue
+            # elif robot_name not in exist_URDF:
+            #     print("URDF folder doesn't contain this robot name",robot_name)
+            #     continue
+            # elif len(os.listdir(URDF_PTH + robot_name))!=2:
+            #     print( "robot URDF folder doesn't contain this robot txt", os.listdir(URDF_PTH+robot_name))
+            #     continue
+            try:
+                initial_joints_angle = np.loadtxt(URDF_PTH + "%s/%s.txt" % (robot_name, robot_name))
+            except:
+                print(robot_name,'This urdf is empty probably')
+                continue
 
             initial_joints_angle = initial_joints_angle[0] if len(
                 initial_joints_angle.shape) == 2 else initial_joints_angle
@@ -272,7 +278,7 @@ if __name__ == "__main__":
                 max_train_step = 100
                 meta_env.sleep_time = 0
                 obs = meta_env.reset()
-
+                time.sleep(1000)
                 step_times = 0
                 r_record = -np.inf
                 ANS_data = []  # size = 12 + 6 + 12 initial np.hstack((initial_joints_angle, obs))

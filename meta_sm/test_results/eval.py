@@ -1,32 +1,67 @@
 import numpy as np
 
 dataset_root = '/home/ubuntu/Documents/data_4_meta_self_modeling_id/'
-robot_names = open('../../data/Jun6_all_urdf_name_163648.txt').read().strip().split('\n')
+robot_names = open('../../data/Jun6_robot_name_181004.txt').read().strip().split('\n')
 robot_names = robot_names[int(0.8 * len(robot_names)):]
-
 model_name = 'model_upbeat-valley-130'
-acc_joint = np.loadtxt(model_name+'/acc_joint.csv')
-acc_leg = np.loadtxt(model_name+'/acc_leg.csv')
 
-leg_right = np.where(acc_leg == 1)[0]
-joint_right = np.where(acc_joint >= 6)[0]
 
-leg_r_num = len(leg_right)
-joint_r_num = len(joint_right)
-data_num = len(acc_joint)
+def acc_robot_name(model_name):
+    robo_exist_list = []
+    for idx in range(10):
+        acc_joint = np.loadtxt(model_name+'_%d/acc_joint.csv'%idx)
+        acc_leg = np.loadtxt(model_name+'_%d/acc_leg.csv'%idx)
 
-j_acc = joint_r_num/data_num
-l_acc = leg_r_num/data_num
+        leg_right = np.where(acc_leg == 1)[0]
+        joint_right = np.where(acc_joint >= 6)[0]
 
-print(j_acc, l_acc)
+        leg_r_num = len(leg_right)
+        joint_r_num = len(joint_right)
+        data_num = len(acc_joint)
 
-passed_robo = np.asarray(joint_right, dtype=np.int32)
+        j_acc = joint_r_num/data_num
+        l_acc = leg_r_num/data_num
 
-robo_exist_list = []
-for i in range(data_num):
-    if i in joint_right and i in leg_right:
-        rn = robot_names[i]
-        robo_exist_list.append(rn)
+        print(j_acc, l_acc)
 
-np.savetxt('100acc_robo_name.txt', robo_exist_list, fmt='%s')
+        passed_robo = np.asarray(joint_right, dtype=np.int32)
 
+
+        for i in range(data_num):
+            if i in joint_right and i in leg_right:
+                rn = robot_names[i]
+                robo_exist_list.append(rn)
+
+    filter_list = []
+    for name in robo_exist_list:
+        if robo_exist_list.count(name) >= 8:
+            if name not in filter_list:
+                filter_list.append(name)
+
+    np.savetxt('100acc_robo_name.txt', filter_list, fmt='%s')
+
+# acc_robot_name(model_name)
+
+def joint_pred_eval():
+    all_robot = np.loadtxt(model_name+'/test_robot_names.txt',dtype='str')
+    pred_joint = np.loadtxt(model_name+'/pred_joint.csv')
+    grth_joint = np.loadtxt(model_name+'/grth_joint.csv')
+    L1_loss = abs(pred_joint-grth_joint)
+    L1_loss = np.where(L1_loss < 6, L1_loss, 12 - L1_loss)
+    L1_loss = L1_loss.reshape(6,-1)/6
+    test_correct_j = (pred_joint == grth_joint).reshape(6,-1).astype(int)
+
+    mean_l1 = np.mean(L1_loss, axis=1)
+    std_l1 = np.std(L1_loss, axis=1)
+
+
+    mean_rst = np.mean(test_correct_j, axis=1)
+    std_rst = np.std(test_correct_j, axis=1)
+
+    print(mean_rst,std_rst)
+
+    np.savetxt(model_name+'/joint_predVSrslt.csv',[mean_rst,std_rst,mean_l1,std_l1])
+    print(pred_joint.shape, grth_joint.shape)
+    print(len(all_robot))
+
+# joint_pred_eval()

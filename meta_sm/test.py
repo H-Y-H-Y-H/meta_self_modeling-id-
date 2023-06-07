@@ -14,16 +14,14 @@ if __name__ == "__main__":
 
     model_name = 'upbeat-valley-130'
     device = 'cuda:0'
-    model_path = '../data/logger_%s/epoch2-acc0.5611' % model_name
+    model_path = '../data/logger_%s/epoch90-acc0.5926' % model_name
     dataset_root = '/home/ubuntu/Documents/data_4_meta_self_modeling_id/'
 
-    robot_names = open('../data/Jun6_all_urdf_name_163648.txt').read().strip().split('\n')
-    robot_names = robot_names[int(0.8*len(robot_names)):]
+    # robot_names = open('../data/Jun6_robot_name_181004.txt').read().strip().split('\n')
+    # robot_names = robot_names[int(0.8*len(robot_names)):]
 
-    # robot_names = np.loadtxt('test_results/100acc_robo_name.txt', dtype='str')[:10]
-
-    result_log_path = 'test_results/model_%s' % model_name
-    os.makedirs(result_log_path, exist_ok=True)
+    idx_sample_flag = -1
+    robot_names = np.loadtxt('test_results/100acc_robo_name.txt', dtype='str')
 
     summary_list, config_list, name_list = [], [], []
     config = None
@@ -82,7 +80,8 @@ if __name__ == "__main__":
                                all_sign_flag=config.all_sign_flag,
                                torch_device=device,
                                choose_10steps_input=config.choose_10steps_input,
-                               obs_noise=0.0)
+                               idx_sample_flag = idx_sample_flag,
+                               obs_noise=0.01)
 
     test_loader = DataLoader(test_dataset,
                              batch_size=batch_size,
@@ -104,6 +103,8 @@ if __name__ == "__main__":
     criterion1 = nn.CrossEntropyLoss()
     criterion2 = nn.CrossEntropyLoss()
     leg_acc_list, joint_acc_list = [], []
+    pred_numpy_list = []
+    grth_numpy_list = []
     for batch in tqdm(test_loader):
         memory, gt_leg_cfg, gt_joint_cfg, length = batch
         memory = memory.to(device)
@@ -119,6 +120,8 @@ if __name__ == "__main__":
             pred_joint_cfg = torch.cat(pred_joint_cfg)
             gt_joint_cfg = gt_joint_cfg.T.flatten()
 
+
+
             joint_loss = criterion2(pred_joint_cfg, gt_joint_cfg)
             loss = (loss_alpha * leg_loss + (1 - loss_alpha) * joint_loss)
 
@@ -132,30 +135,48 @@ if __name__ == "__main__":
             test_correct_leg = (pred_leg_cfg_id == gt_leg_cfg).int()
             test_correct_leg = test_correct_leg.detach().cpu().numpy()
 
-            test_result = (pred_joint_cfg_id == gt_joint_cfg).int().view(6,-1).T # 16 x 6
-            test_result = test_result.sum(dim=1).detach().cpu().numpy() # 16 x 1
+            test_result = (pred_joint_cfg_id == gt_joint_cfg).int().view(6, -1).T
+
+            pred_numpy_list.append(pred_joint_cfg_id.detach().cpu().numpy())
+            grth_numpy_list.append(gt_joint_cfg.detach().cpu().numpy())
+
+            joint_acc = test_result.sum(dim=1).detach().cpu().numpy()
 
             leg_acc_list.append(test_correct_leg)
-            joint_acc_list.append(test_result)
+            joint_acc_list.append(joint_acc)
 
             test_joint_sample_num += len(gt_joint_cfg)
             test_leg_sample_num += len(gt_leg_cfg)
 
-        test_leg_acc += test_correct_leg.sum()
-        test_joint_acc += test_result.sum()
+            test_leg_acc += test_correct_leg.sum()
+            test_joint_acc += joint_acc.sum()
 
-        test_running_leg_loss /= test_b_num
-        test_running_joint_loss /= test_b_num
-        test_running_loss /= test_b_num
+            test_running_leg_loss /= test_b_num
+            test_running_joint_loss /= test_b_num
+            test_running_loss /= test_b_num
 
     log_data = [test_leg_acc / test_b_num,
                 test_joint_acc / (test_b_num * 6),
                 (test_joint_acc + test_leg_acc) / (test_b_num * 7),
                 test_running_leg_loss, test_running_joint_loss, test_running_loss]
 
+
+
     joint_acc_list = np.concatenate(joint_acc_list)
     leg_acc_list = np.concatenate(leg_acc_list)
+    pred_numpy_list = np.concatenate(pred_numpy_list)
+    grth_numpy_list = np.concatenate(grth_numpy_list)
+
+
+
+    result_log_path = 'test_results/model_%s_%d' % (model_name,idx_sample_flag)
+    os.makedirs(result_log_path, exist_ok=True)
+
     print("results save in: ", result_log_path)
+    np.savetxt(result_log_path + '/pred_joint.csv', pred_numpy_list)
+    np.savetxt(result_log_path + '/grth_joint.csv', grth_numpy_list)
+
+
     np.savetxt(result_log_path + '/acc_leg.csv', np.array(leg_acc_list))
     np.savetxt(result_log_path + '/acc_joint.csv', joint_acc_list)
     np.savetxt(result_log_path + '/test_robot_names.txt', test_robot_names, fmt='%s')
