@@ -17,8 +17,8 @@ if __name__ == "__main__":
     # model_name = 'wobbly-sponge-143'
     # model_path = '../data/logger_wobbly-sponge-143/epoch814-acc0.7655'
 
-    model_name = 'expert-surf-151'
-    model_path = '../data/logger_%s/epoch120-acc0.3172'%model_name
+    model_name = 'lemon-aardvark-152'
+    model_path = '../data/logger_%s/epoch49-acc0.6427'%model_name
 
 
 
