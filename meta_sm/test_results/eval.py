@@ -3,7 +3,7 @@ import numpy as np
 dataset_root = '/home/ubuntu/Documents/data_4_meta_self_modeling_id/'
 robot_names = open('../../data/Jun6_robot_name_200115.txt').read().strip().split('\n')
 robot_names = robot_names[int(0.8 * len(robot_names)):]
-model_name = 'model_'+'confused-monkey-145_0'
+model_name = 'model_'+'wobbly-sponge-143'
 
 
 def acc_robot_name(model_name):
@@ -13,7 +13,7 @@ def acc_robot_name(model_name):
         acc_leg = np.loadtxt(model_name+'_%d/acc_leg.csv'%idx)
 
         leg_right = np.where(acc_leg == 1)[0]
-        joint_right = np.where(acc_joint >= 3)[0]
+        joint_right = np.where(acc_joint >= 4)[0]
 
         leg_r_num = len(leg_right)
         joint_r_num = len(joint_right)
@@ -42,7 +42,8 @@ def acc_robot_name(model_name):
 
 # acc_robot_name(model_name)
 
-def joint_pred_eval():
+def joint_pred_eval(model_name):
+    model_name=model_name+'_0'
     all_robot = np.loadtxt(model_name+'/test_robot_names.txt',dtype='str')
     pred_joint = np.loadtxt(model_name+'/pred_joint.csv')
     grth_joint = np.loadtxt(model_name+'/grth_joint.csv')
@@ -64,7 +65,7 @@ def joint_pred_eval():
     print(pred_joint.shape, grth_joint.shape)
     print(len(all_robot))
 
-joint_pred_eval()
+joint_pred_eval(model_name)
 
 def leg_pred_eval(model_name):
     acc_leg = np.loadtxt(model_name + '/acc_leg.csv' )

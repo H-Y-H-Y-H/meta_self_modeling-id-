@@ -156,7 +156,7 @@ def train():
     dataset_root = '/home/ubuntu/Documents/data_4_meta_self_modeling_id/'
     data_robot_names = open('../data/Jun6_robot_name_200115.txt').read().strip().split('\n')
 
-    pretrained_flag = False
+    pretrained_flag = True
     pretrained = '../data/logger_wobbly-sponge-143/epoch814-acc0.7655'
 
     use_wandb = True
@@ -164,7 +164,7 @@ def train():
     wandb.init(project="meta_id_dyna", entity="robotics")  #,mode="disabled"
     config = wandb.config
     config.robot_num = len(data_robot_names)
-    config.learning_rate = 0.001
+    config.learning_rate = 0.000125
     config.loss_alpha = 0.25
     config.dropout = 0.0
     config.mlp_hidden_dim = 512
@@ -173,14 +173,14 @@ def train():
     config.max_sample_size = 1        # 16 sub steps/ step; 10 steps/epoch
     config.choose_10steps_input = True
     config.all_sign_flag = False
-    config.obs_noise = 0.01
+    config.obs_noise = 0.0
     max_sample_size = config.max_sample_size
     config.task = 3
     running_name = wandb.run.name
     config.batch_size = 128
     config.pos_encoder = False
-    config.torch_device = "cuda:0"
-    config.baseline_id = 3
+    config.torch_device = "cuda:1"
+    config.baseline_id = 0
 
     log_dir = "../data/logger_%s/" % (running_name)
     config.log_dir = log_dir

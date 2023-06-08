@@ -14,9 +14,9 @@ if __name__ == "__main__":
     api = wandb.Api()
     runs = api.runs("robotics/meta_id_dyna")
 
-    model_name = 'confused-monkey-145'
+    model_name = 'wobbly-sponge-143'
     device = 'cuda:0'
-    model_path = '../data/logger_%s/epoch273-acc0.6555' % model_name
+    model_path = '../data/logger_%s/epoch814-acc0.7655' % model_name
 
     if real_test:
         dataset_root = '/home/ubuntu/Desktop/meta_real/data/robot_sign_data/'
