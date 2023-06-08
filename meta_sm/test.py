@@ -14,9 +14,9 @@ if __name__ == "__main__":
     api = wandb.Api()
     runs = api.runs("robotics/meta_id_dyna")
 
-    model_name = 'icy-flower-142'
-    device = 'cuda:1'
-    model_path = '../data/logger_%s/epoch76-acc0.6472' % model_name
+    model_name = 'confused-monkey-145'
+    device = 'cuda:0'
+    model_path = '../data/logger_%s/epoch273-acc0.6555' % model_name
 
     if real_test:
         dataset_root = '/home/ubuntu/Desktop/meta_real/data/robot_sign_data/'
@@ -25,7 +25,7 @@ if __name__ == "__main__":
         dataset_root = '/home/ubuntu/Documents/data_4_meta_self_modeling_id/'
         robot_names = open('../data/Jun6_robot_name_200115.txt').read().strip().split('\n')
         robot_names = robot_names[int(0.8*len(robot_names)):]
-    idx_sample_flag = 9
+    idx_sample_flag = -1
     print('idx',idx_sample_flag)
     # robot_names = np.loadtxt('test_results/100acc_robo_name.txt', dtype='str')
 

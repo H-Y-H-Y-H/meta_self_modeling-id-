@@ -156,8 +156,8 @@ def train():
     dataset_root = '/home/ubuntu/Documents/data_4_meta_self_modeling_id/'
     data_robot_names = open('../data/Jun6_robot_name_200115.txt').read().strip().split('\n')
 
-    pretrained_flag = True
-    pretrained = '../data/logger_morning-wind-139/epoch19-acc0.4538'
+    pretrained_flag = False
+    pretrained = '../data/logger_wobbly-sponge-143/epoch814-acc0.7655'
 
     use_wandb = True
 
@@ -173,14 +173,14 @@ def train():
     config.max_sample_size = 1        # 16 sub steps/ step; 10 steps/epoch
     config.choose_10steps_input = True
     config.all_sign_flag = False
-    config.obs_noise = 0.0
+    config.obs_noise = 0.01
     max_sample_size = config.max_sample_size
     config.task = 3
     running_name = wandb.run.name
     config.batch_size = 128
     config.pos_encoder = False
     config.torch_device = "cuda:0"
-    config.baseline_id = 1
+    config.baseline_id = 3
 
     log_dir = "../data/logger_%s/" % (running_name)
     config.log_dir = log_dir

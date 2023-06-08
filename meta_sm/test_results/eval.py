@@ -3,17 +3,17 @@ import numpy as np
 dataset_root = '/home/ubuntu/Documents/data_4_meta_self_modeling_id/'
 robot_names = open('../../data/Jun6_robot_name_200115.txt').read().strip().split('\n')
 robot_names = robot_names[int(0.8 * len(robot_names)):]
-model_name = 'model_'+'icy-flower-142'
+model_name = 'model_'+'confused-monkey-145_0'
 
 
 def acc_robot_name(model_name):
     robo_exist_list = []
-    for idx in range(10):
+    for idx in range(1):
         acc_joint = np.loadtxt(model_name+'_%d/acc_joint.csv'%idx)
         acc_leg = np.loadtxt(model_name+'_%d/acc_leg.csv'%idx)
 
         leg_right = np.where(acc_leg == 1)[0]
-        joint_right = np.where(acc_joint >= 6)[0]
+        joint_right = np.where(acc_joint >= 3)[0]
 
         leg_r_num = len(leg_right)
         joint_r_num = len(joint_right)
@@ -32,15 +32,15 @@ def acc_robot_name(model_name):
                 rn = robot_names[i]
                 robo_exist_list.append(rn)
 
-    filter_list = []
-    for name in robo_exist_list:
-        if robo_exist_list.count(name) >= 10:
-            if name not in filter_list:
-                filter_list.append(name)
+    # filter_list = []
+    # for name in robo_exist_list:
+    #     if robo_exist_list.count(name) >= 10:
+    #         if name not in filter_list:
+    #             filter_list.append(name)
+    print(len(robo_exist_list)/data_num)
+    np.savetxt('100acc_robo_name.txt', robo_exist_list, fmt='%s')
 
-    np.savetxt('100acc_robo_name.txt', filter_list, fmt='%s')
-
-acc_robot_name(model_name)
+# acc_robot_name(model_name)
 
 def joint_pred_eval():
     all_robot = np.loadtxt(model_name+'/test_robot_names.txt',dtype='str')
@@ -64,7 +64,7 @@ def joint_pred_eval():
     print(pred_joint.shape, grth_joint.shape)
     print(len(all_robot))
 
-# joint_pred_eval()
+joint_pred_eval()
 
 def leg_pred_eval(model_name):
     acc_leg = np.loadtxt(model_name + '/acc_leg.csv' )

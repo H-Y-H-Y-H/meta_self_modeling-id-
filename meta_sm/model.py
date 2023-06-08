@@ -65,7 +65,8 @@ class MLSTMfcn(nn.Module):
         self.global_feat_dim = self.conv3_nf + self.num_lstm_out
 
         self.output_size = self.global_feat_dim
-
+        if self.baseline_id ==3:
+            self.l1 = nn.Linear(self.num_features*160,1024)
     def forward(self, x, length):
         # x: batch x seq_len x channels
         # packed_x = pack_padded_sequence(x, length.cpu().numpy(), batch_first=True)
@@ -94,10 +95,17 @@ class MLSTMfcn(nn.Module):
             x2 = torch.mean(x2, 2)
             x_all = torch.cat((x2, x2), dim=1)
 
-        elif self.baseline_id==2:
+        elif self.baseline_id == 2:
             packed_x_out, (ht, ct) = self.lstm(x)
             x1 = ht[-1]
             x_all = torch.cat((x1, x1), dim=1)
+        elif self.baseline_id == 3:
+            packed_x_out, (ht, ct) = self.lstm(x)
+            x1 = ht[-1]
+            x_all = torch.cat((x1, x1), dim=1)
+            # print(x.shape, x_all.shape)
+
+            x_all = self.l1(x.reshape(len(x),-1))
 
         return x_all
 

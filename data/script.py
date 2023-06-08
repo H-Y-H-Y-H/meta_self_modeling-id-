@@ -228,10 +228,11 @@ def transfer_urdf_to_target():
 # transfer_urdf_to_target()
 
 def get_urdf_name_list():
-    target_urdf_pth = '/home/ubuntu/Documents/data_4_meta_self_modeling_id/sign_data/'
+    # target_urdf_pth = '/home/ubuntu/Documents/data_4_meta_self_modeling_id/sign_data/'
 
-    # target_urdf_pth = '/home/ubuntu/Documents/data_4_meta_self_modeling_id/robot_urdf/'
+    target_urdf_pth = '/home/ubuntu/Documents/data_4_meta_self_modeling_id/robot_urdf/'
     all_old_files = os.listdir(target_urdf_pth)
+
     # # np.savetxt("Jun3_robot_name_%d.txt" % len(all_old_files), all_old_files, fmt="%s")
 
     for i in range(len(all_old_files)):
@@ -245,28 +246,30 @@ def get_urdf_name_list():
     #         np.save(folder_pth+'/sans_100_0_V2.npy', file_new)
 
     # np.savetxt('all_urdf_name_%d.txt' % len(all_old_files), all_old_files, fmt="%s")
-    np.savetxt('Jun6_robot_name_%d.txt'%len(all_old_files), all_old_files, fmt="%s")
+    # np.savetxt('Jun6_robot_name_%d.txt'%len(all_old_files), all_old_files, fmt="%s")
 
 # get_urdf_name_list()
 
 
 def transfer_urdf_to_temp_urdf():
 
-    robot_names = np.loadtxt('../meta_sm/test_results/100acc_robo_name.txt', dtype='str')
+    # robot_names = np.loadtxt('../meta_sm/test_results/100acc_robo_name.txt', dtype='str')
 
     urdf_pth = '/home/ubuntu/Documents/data_4_meta_self_modeling_id/robot_urdf/'
-    all_files = os.listdir(urdf_pth)
+    target_urdf_pth = '/home/ubuntu/Documents/data_4_meta_self_modeling_id/200k_robot/'
+    data_robot_names = open('../data/Jun6_robot_name_200115.txt').read().strip().split('\n')
+
     count = 0
 
-    target_urdf_pth = '../robot_zoo/'
-    for i in range(len(robot_names)):
-        ur_name = robot_names[i]
+    # target_urdf_pth = '../robot_zoo/'
+    for i in range(len(data_robot_names)):
+        ur_name = data_robot_names[i]
         src1 = urdf_pth + '%s/%s.txt'%(ur_name,ur_name)
         src2 = urdf_pth + '%s/%s.urdf'%(ur_name,ur_name)
 
         tgt1 = target_urdf_pth + '%s/%s.txt'%(ur_name,ur_name)
         tgt2 = target_urdf_pth + '%s/%s.urdf'%(ur_name,ur_name)
-        os.makedirs(target_urdf_pth+ur_name,exist_ok=True)
+        os.makedirs(target_urdf_pth+ur_name, exist_ok=True)
 
         shutil.copyfile(src1, tgt1)
         shutil.copyfile(src2, tgt2)
