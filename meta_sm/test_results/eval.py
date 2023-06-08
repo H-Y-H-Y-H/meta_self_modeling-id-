@@ -3,7 +3,7 @@ import numpy as np
 dataset_root = '/home/ubuntu/Documents/data_4_meta_self_modeling_id/'
 robot_names = open('../../data/Jun6_robot_name_200115.txt').read().strip().split('\n')
 robot_names = robot_names[int(0.8 * len(robot_names)):]
-model_name = 'model_'+'wobbly-sponge-143'
+model_name = 'model_'+'expert-surf-151'
 
 
 def acc_robot_name(model_name):
@@ -40,7 +40,7 @@ def acc_robot_name(model_name):
     print(len(robo_exist_list)/data_num)
     np.savetxt('100acc_robo_name.txt', robo_exist_list, fmt='%s')
 
-# acc_robot_name(model_name)
+acc_robot_name(model_name)
 
 def joint_pred_eval(model_name):
     model_name=model_name+'_0'
