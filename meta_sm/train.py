@@ -156,7 +156,7 @@ def train():
     dataset_root = '/home/ubuntu/Documents/data_4_meta_self_modeling_id/'
     data_robot_names = open('../data/Jun6_robot_name_200115.txt').read().strip().split('\n')
 
-    pretrained_flag = True
+    pretrained_flag = False
     pretrained = '../data/logger_wobbly-sponge-143/epoch814-acc0.7655'
 
     use_wandb = True
@@ -181,16 +181,21 @@ def train():
     config.pos_encoder = False
     config.torch_device = "cuda:1"
     config.baseline_id = 0
+    config.rm_xyz = True
 
     log_dir = "../data/logger_%s/" % (running_name)
     config.log_dir = log_dir
     config.pre_trained = pretrained_flag
     os.makedirs(log_dir, exist_ok=True)
-    PosEnc = PositionalEncoder(d_input=28, n_freqs=5)
+    PosEnc = PositionalEncoder(d_input=30, n_freqs=5)
 
     num_epochs = 10000
     num_worker = 5
     sign_size = 100
+    if config.rm_xyz:
+        d_input = 27
+    else:
+        d_input = 30
 
     robot_paths = dict()
     for rn in data_robot_names:
@@ -252,7 +257,7 @@ def train():
                               num_workers=num_worker)  # , collate_fn=valid_dataset.collate
 
     # Setup model
-    model = PredConf(state_dim=30,
+    model = PredConf(state_dim=d_input,
                      do=config.dropout,
                      MLSTM_hidden_dim=config.MLSTM_hidden_dim,
                      mlp_hidden_dim=config.mlp_hidden_dim,
@@ -299,7 +304,9 @@ def train():
             memory, gt_leg_cfg, gt_joint_cfg, length = batch
             if config.pos_encoder:
                 memory = PosEnc(memory)
-            memory = memory.to(config.torch_device)
+            if config.rm_xyz:
+                memory = memory[:,:,3:]
+            memory = memory.to(config.torch_device) #batch x seq x d_state
             gt_leg_cfg = gt_leg_cfg.to(config.torch_device)
             gt_joint_cfg = gt_joint_cfg.to(config.torch_device)
             optimizer.zero_grad()
@@ -349,6 +356,8 @@ def train():
             memory, gt_leg_cfg, gt_joint_cfg, length = batch
             if config.pos_encoder:
                 memory = PosEnc(memory)
+            if config.rm_xyz:
+                memory = memory[:,:,3:]
             memory = memory.to(config.torch_device)
             gt_leg_cfg = gt_leg_cfg.to(config.torch_device)
             gt_joint_cfg = gt_joint_cfg.to(config.torch_device)

@@ -3,7 +3,7 @@ import numpy as np
 dataset_root = '/home/ubuntu/Documents/data_4_meta_self_modeling_id/'
 robot_names = open('../../data/Jun6_robot_name_200115.txt').read().strip().split('\n')
 robot_names = robot_names[int(0.8 * len(robot_names)):]
-model_name = 'model_'+'lemon-aardvark-152'
+model_name = 'model_'+'glad-dawn-158'
 
 
 def acc_robot_name(model_name):

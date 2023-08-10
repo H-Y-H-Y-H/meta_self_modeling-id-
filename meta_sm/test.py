@@ -1,7 +1,3 @@
-import os
-
-import numpy as np
-
 from train import *
 
 # def get_dataset():
@@ -17,10 +13,14 @@ if __name__ == "__main__":
     # model_name = 'wobbly-sponge-143'
     # model_path = '../data/logger_wobbly-sponge-143/epoch814-acc0.7655'
 
-    model_name = 'lemon-aardvark-152'
-    model_path = '../data/logger_%s/epoch49-acc0.6427'%model_name
+    # model_name = 'expert-surf-151'
+    # model_path = '../data/logger_%s/epoch120-acc0.3172'%model_name
 
+    # model_name = 'lemon-aardvark-152'
+    # model_path = '../data/logger_%s/epoch49-acc0.6427'%model_name
 
+    model_name = 'glad-dawn-158'
+    model_path = '../data/logger_%s/epoch257-acc0.6214'%model_name
 
     if real_test:
         dataset_root = '/home/ubuntu/Desktop/meta_real/data/robot_sign_data/'
@@ -29,8 +29,9 @@ if __name__ == "__main__":
         dataset_root = '/home/ubuntu/Documents/data_4_meta_self_modeling_id/'
         robot_names = open('../data/Jun6_robot_name_200115.txt').read().strip().split('\n')
         robot_names = robot_names[int(0.8*len(robot_names)):]
+
     idx_sample_flag = 0
-    print('idx',idx_sample_flag)
+    print('idx', idx_sample_flag)
     # robot_names = np.loadtxt('test_results/100acc_robo_name.txt', dtype='str')
 
     summary_list, config_list, name_list = [], [], []
@@ -41,11 +42,13 @@ if __name__ == "__main__":
             config = {k: v for k, v in run.config.items() if not k.startswith('_')}
 
     config = argparse.Namespace(**config)
+    PosEnc = PositionalEncoder(d_input=30, n_freqs=5)
 
     sign_size = 100
     batch_size = 128
     num_worker = 0
     loss_alpha = 0.25
+    d_input = 27
 
     if real_test:
         robot_paths = dict()
@@ -64,13 +67,7 @@ if __name__ == "__main__":
     for i in range(len(idx2leg)):
         leg2idx[tuple(idx2leg[i])] = i
 
-    # # split_idx = int(len(robot_names) * 0.8)
-    # split_idx = 0
-    # # train_robot_names = robot_names[:split_idx]
-    # test_robot_names = robot_names[split_idx:]
-    # print(len(test_robot_names), "robots will be tested")
-
-    model = PredConf(state_dim=30,
+    model = PredConf(state_dim=d_input,
                      MLSTM_hidden_dim=config.MLSTM_hidden_dim,
                      mlp_hidden_dim=config.mlp_hidden_dim,
                      single_objective=config.task,
@@ -120,12 +117,15 @@ if __name__ == "__main__":
     grth_numpy_list = []
     for batch in tqdm(test_loader):
         memory, gt_leg_cfg, gt_joint_cfg, length = batch
+        if config.pos_encoder:
+            memory = PosEnc(memory)
+        if config.rm_xyz:
+            memory = memory[:, :, 3:]
         memory = memory.to(device)
         gt_leg_cfg = gt_leg_cfg.to(device)
         gt_joint_cfg = gt_joint_cfg.to(device)
 
         with torch.no_grad():
-
             # memory: batch x length x channels
             pred_leg_cfg, pred_joint_cfg = model(memory, length)  # N x 30;
 
