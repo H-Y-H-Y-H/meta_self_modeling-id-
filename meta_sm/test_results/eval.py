@@ -13,7 +13,7 @@ def acc_robot_name(model_name):
         acc_leg = np.loadtxt(model_name+'_%d/acc_leg.csv'%idx)
 
         leg_right = np.where(acc_leg == 1)[0]
-        joint_right = np.where(acc_joint >= 4)[0]
+        joint_right = np.where(acc_joint ==6)[0]
 
         leg_r_num = len(leg_right)
         joint_r_num = len(joint_right)
@@ -25,7 +25,6 @@ def acc_robot_name(model_name):
         print(j_acc, l_acc)
 
         passed_robo = np.asarray(joint_right, dtype=np.int32)
-
 
         for i in range(data_num):
             if i in joint_right and i in leg_right:
@@ -43,7 +42,7 @@ def acc_robot_name(model_name):
 acc_robot_name(model_name)
 
 def joint_pred_eval(model_name):
-    model_name=model_name+'_0'
+    model_name = model_name+'_0'
     all_robot = np.loadtxt(model_name+'/test_robot_names.txt',dtype='str')
     pred_joint = np.loadtxt(model_name+'/pred_joint.csv')
     grth_joint = np.loadtxt(model_name+'/grth_joint.csv')
@@ -65,7 +64,7 @@ def joint_pred_eval(model_name):
     print(pred_joint.shape, grth_joint.shape)
     print(len(all_robot))
 
-joint_pred_eval(model_name)
+# joint_pred_eval(model_name)
 
 def leg_pred_eval(model_name):
     acc_leg = np.loadtxt(model_name + '/acc_leg.csv' )
