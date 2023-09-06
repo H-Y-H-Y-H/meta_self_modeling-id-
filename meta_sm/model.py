@@ -100,9 +100,9 @@ class MLSTMfcn(nn.Module):
             x1 = ht[-1]
             x_all = torch.cat((x1, x1), dim=1)
         elif self.baseline_id == 3:
-            packed_x_out, (ht, ct) = self.lstm(x)
-            x1 = ht[-1]
-            x_all = torch.cat((x1, x1), dim=1)
+            # packed_x_out, (ht, ct) = self.lstm(x)
+            # x1 = ht[-1]
+            # x_all = torch.cat((x1, x1), dim=1)
             # print(x.shape, x_all.shape)
 
             x_all = self.l1(x.reshape(len(x),-1))

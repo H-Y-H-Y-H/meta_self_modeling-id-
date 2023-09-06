@@ -154,7 +154,7 @@ class SASFDataset(Dataset):
 
 def train():
     dataset_root = '/home/ubuntu/Documents/data_4_meta_self_modeling_id/'
-    data_robot_names = open('../data/Jun6_robot_name_200115.txt').read().strip().split('\n')
+    data_robot_names = open('../data/Jun6_robot_name_200115.txt').read().strip().split('\n')[:100]
 
     pretrained_flag = False
     pretrained = '../data/logger_wobbly-sponge-143/epoch814-acc0.7655'
