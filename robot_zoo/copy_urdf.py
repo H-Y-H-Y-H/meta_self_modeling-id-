@@ -15,7 +15,7 @@ def transfer_urdf_to_temp_urdf():
     count = 0
 
     # target_urdf_pth = '../robot_zoo/'
-    for i in range(30):
+    for i in range(100):
         ur_name = fully_acc_name_list[i]
         src1 = urdf_pth + '%s/%s.txt'%(ur_name,ur_name)
         src2 = urdf_pth + '%s/%s.urdf'%(ur_name,ur_name)
