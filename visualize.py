@@ -10,7 +10,7 @@ import numpy as np
 np.random.seed(2022)
 
 class robot_zoo(gym.Env):
-    def __init__(self, robot_list_name,robot_camera=False):
+    def __init__(self, robot_name,robot_camera=False):
 
         self.stateID = None
         self.robotid = None
@@ -26,6 +26,7 @@ class robot_zoo(gym.Env):
 
         self.maxVelocity = 1.5  # lx-224 0.20 sec/60degree = 5.236 rad/s
         self.force = 1.8
+        self.robot_name= robot_name
 
         # self.max_velocity = 1.8
         # self.force = 1.6
@@ -115,6 +116,7 @@ class robot_zoo(gym.Env):
         p.setAdditionalSearchPath(pd.getDataPath())
         planeId = p.loadURDF("plane.urdf")
         p.changeDynamics(planeId, -1, lateralFriction=self.friction)
+        p.resetDebugVisualizerCamera(cameraDistance=0.6, cameraYaw=120, cameraPitch=-45, cameraTargetPosition=[0, 0, 0])
 
         # p.changeVisualShape(planeId, -1, rgbaColor=[0.2, 0.2, 0.2, 1])
 
@@ -125,16 +127,15 @@ class robot_zoo(gym.Env):
         self.robotid = []
         random.seed(0)
 
-        random.shuffle(robot_name_list)
+        # random.shuffle(self.robot_name_list)
 
         for i in range(1):
 
-            robot_name = robot_name_list[i]
 
-            init_q = np.loadtxt(URDF_PTH + "%s/%s.txt" % (robot_name, robot_name))
+            init_q = np.loadtxt(URDF_PTH + "%s/%s.txt" % (self.robot_name, self.robot_name))
 
             robotStartPos = [(i%length), (i//length),0.3]
-            urdfpath = URDF_PTH + "%s/%s.urdf" % (robot_name, robot_name)
+            urdfpath = URDF_PTH + "%s/%s.urdf" % (self.robot_name, self.robot_name)
             self.robotid= p.loadURDF(urdfpath ,robotStartPos, robotStartOrientation, flags=p.URDF_USE_SELF_COLLISION,
                                   useFixedBase=0)
             # text_id = p.addUserDebugText("Robot: "+ robot_name, [(i%length), (i//width)-0.5,0.5],
@@ -230,9 +231,11 @@ class robot_zoo(gym.Env):
 
 p.connect(p.GUI)
 
-URDF_PTH = 'robot_zoo/'
-# robot_name_list = np.loadtxt('meta_sm/test_results/100acc_robo_name.txt',dtype='str')
-robot_name_list = os.listdir(URDF_PTH)
+URDF_PTH = 'robot_zoo/100acc_urdf/'
+robot_name_list = np.loadtxt('meta_sm/test_results/100acc_robo_name.txt', dtype='str')
+robo_name = robot_name_list[0]
+print(robot_name_list[0])
+# robot_name_list = os.listdir(URDF_PTH)
 # robot_name_list = ["11_0_2_0_10_0_9_2_14_0_3_10_13_0_10_0"]*2
 
 para_config = np.loadtxt('data/para_config.csv')
@@ -240,12 +243,20 @@ initial_para = para_config[:, 0]
 para_range = para_config[:, 1:]
 
 
+import matplotlib.pyplot as plt
 
-meta_env = robot_zoo(robot_name_list)
-meta_env.reset()
-while 1:
-    a = 0
-    p.stepSimulation()
-    time.sleep(1/240)
+for robo_name in robot_name_list[:100]:
+
+    meta_env = robot_zoo(robo_name)
+    meta_env.reset()
+
+    for i in range(1):
+        a = 0
+        p.stepSimulation()
+        time.sleep(1/240)
+
+        width, height, rgbImg, depthImg, segImg = p.getCameraImage(width=1280, height=960)
+
+        plt.imsave('robot_zoo/100acc_urdf/%s.png'%robo_name,rgbImg)
 
 
