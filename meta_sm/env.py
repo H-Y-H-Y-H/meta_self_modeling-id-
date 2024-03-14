@@ -207,7 +207,7 @@ def call_max_reward_action(train_data, test_data):
     return a_choose
 
 
-URDF_PTH = "/home/ubuntu/Documents/data_4_meta_self_modeling_id/robot_urdf/"
+URDF_PTH = "/home/ubuntu/Documents/data_4_meta_self_modeling_id/200k_robot/"
 data_save_root = "/home/ubuntu/Documents/data_4_meta_self_modeling_id/sign_data/"
 
 if __name__ == "__main__":
@@ -217,17 +217,17 @@ if __name__ == "__main__":
 
     # [1, 2, 3, 4, 9, 11, 13, 14, 15, 16, 17, 22, 30, 31, 32, 34]
     if mode == 0:
-        save_flg = True
+        save_flg = False
         add_sans = 0
 
-        taskID = 28
+        taskID = 0
         print('Task:', taskID)
         num_robots_per_task = 10000
 
         Train = True
-        p.connect(p.DIRECT)
+        p.connect(p.GUI)
         # p.connect(p.GUI)
-        robot_list = list(np.loadtxt('../data/all_urdf_name_283327.txt', dtype=str))
+        robot_list = list(np.loadtxt('../data/Jun6_robot_name_200115.txt', dtype=str))
         # robot_list = os.listdir('/home/ubuntu/Documents/data_4_meta_self_modeling_id/robot_urdf_search/')
         para_config = np.loadtxt('../data/para_config.csv')
 
@@ -237,7 +237,7 @@ if __name__ == "__main__":
         done_times_log = []
         filtered_robot_list = []
 
-        exist_folder = '/home/ubuntu/Documents/data_4_meta_self_modeling_id/sign_data/'
+        exist_folder = '/home/ubuntu/Documents/data_4_meta_self_modeling_id/200k_robot/'
         exist_sign_data = os.listdir(exist_folder)
         exist_URDF = os.listdir(URDF_PTH)
 
@@ -246,16 +246,18 @@ if __name__ == "__main__":
             # robot_name = "11_0_2_0_10_0_9_2_14_0_3_10_13_0_10_0"
             print(robotid, robot_name)
             log_pth = data_save_root + "%s/" % robot_name
+            if save_flg:
 
-            if robot_name in exist_sign_data:
-                print('exist!')
-                continue
-            elif robot_name not in exist_URDF:
-                print("URDF folder doesn't contain this robot name", robot_name)
-                continue
-            elif len(os.listdir(URDF_PTH + robot_name)) != 2:
-                print("robot URDF folder doesn't contain this robot txt", os.listdir(URDF_PTH+robot_name))
-                continue
+                if robot_name in exist_sign_data:
+                    print('exist!')
+                    continue
+                elif robot_name not in exist_URDF:
+                    print("URDF folder doesn't contain this robot name", robot_name)
+                    continue
+                elif len(os.listdir(URDF_PTH + robot_name)) != 2:
+                    print("robot URDF folder doesn't contain this robot txt", os.listdir(URDF_PTH+robot_name))
+                    continue
+
             try:
                 initial_joints_angle = np.loadtxt(URDF_PTH + "%s/%s.txt" % (robot_name, robot_name))
             except:
