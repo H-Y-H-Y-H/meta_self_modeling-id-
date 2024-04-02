@@ -276,8 +276,8 @@ class meta_sm_Env(gym.Env):
             abort_flag = True
         # elif pos[1] < -0.04:
         #     abort_flag = True
-        elif abs(pos[2]) < 0.13:
-            abort_flag = True
+        # elif abs(pos[2]) < 0.13:
+        #     abort_flag = True
         else:
             abort_flag = False
 
@@ -291,8 +291,8 @@ data_save_root = "/home/ubuntu/Documents/data_4_meta_self_modeling_id/sign_data/
 if __name__ == "__main__":
 
     # Train
-    mode = 1
-    Task = 17
+    mode = 0
+    Task = 4
     print(Task) # 13-17 right
 
 
@@ -304,9 +304,9 @@ if __name__ == "__main__":
         BEHAVIOR = 'r'
 
     friction_noise_Flag = True
-    friction_noise_list = [0.9, 0.99,2.99]
+    friction_noise_list = [0.65, 0.75,0.89]
 
-    action_noise = 0.3
+    action_noise = 0.1
     if mode == 0:
         random_search_factor = 0.2
         Time_SLEEP_FLAG = False
