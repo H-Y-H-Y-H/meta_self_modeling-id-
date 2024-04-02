@@ -54,7 +54,6 @@ def joint_pred_eval(model_name):
     mean_l1 = np.mean(L1_loss, axis=1)
     std_l1 = np.std(L1_loss, axis=1)
 
-
     mean_rst = np.mean(test_correct_j, axis=1)
     std_rst = np.std(test_correct_j, axis=1)
 

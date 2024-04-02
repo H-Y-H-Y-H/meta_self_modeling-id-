@@ -102,6 +102,7 @@ class meta_sm_Env(gym.Env):
 
         for _ in range(self.n_sim_steps):
             p.stepSimulation()
+            # time.sleep(1/240)
 
             # if self.render:
             #     # Capture Camera
@@ -125,11 +126,23 @@ class meta_sm_Env(gym.Env):
 
         self.robotid = p.loadURDF(self.urdf_path, robotStartPos, robotStartOrientation, flags=p.URDF_USE_SELF_COLLISION,
                                   useFixedBase=0)
+        p.resetDebugVisualizerCamera(cameraDistance=1, cameraYaw=140, cameraPitch=-45, cameraTargetPosition=[0, 0, 0])
 
         p.changeDynamics(self.robotid, 2, lateralFriction=self.friction)
         p.changeDynamics(self.robotid, 5, lateralFriction=self.friction)
         p.changeDynamics(self.robotid, 8, lateralFriction=self.friction)
         p.changeDynamics(self.robotid, 11, lateralFriction=self.friction)
+        p.changeVisualShape(self.robotid, -1, rgbaColor=[118 / 255, 182 / 255, 238 / 255, 1])
+
+        for link in [0, 2,
+                     5, 7,
+                     10, 12,
+                     15, 17]:
+            p.changeVisualShape(self.robotid, link, rgbaColor=[2 / 255, 33 / 255, 105 / 255, 1])
+
+        for link in [1, 3, 6, 8, 11, 13, 16, 18]:
+            p.changeVisualShape(self.robotid, link, rgbaColor=[118 / 255, 182 / 255, 238 / 255, 1])
+
 
         for j in range(12):
             pos_value = self.initial_moving_joints_angle[j]
@@ -207,7 +220,7 @@ def call_max_reward_action(train_data, test_data):
     return a_choose
 
 
-URDF_PTH = "/home/ubuntu/Documents/data_4_meta_self_modeling_id/robot_urdf/"
+URDF_PTH = '../robot_zoo/no_idea/'
 data_save_root = "/home/ubuntu/Documents/data_4_meta_self_modeling_id/sign_data/"
 
 if __name__ == "__main__":
@@ -220,15 +233,15 @@ if __name__ == "__main__":
         save_flg = True
         add_sans = 0
 
-        taskID = 28
+        taskID = 0
         print('Task:', taskID)
         num_robots_per_task = 10000
 
         Train = True
-        p.connect(p.DIRECT)
-        # p.connect(p.GUI)
-        robot_list = list(np.loadtxt('../data/all_urdf_name_283327.txt', dtype=str))
-        # robot_list = os.listdir('/home/ubuntu/Documents/data_4_meta_self_modeling_id/robot_urdf_search/')
+        # p.connect(p.DIRECT)
+        p.connect(p.GUI)
+        # robot_list = list(np.loadtxt('../data/all_urdf_name_283327.txt', dtype=str))
+        robot_list = os.listdir(URDF_PTH)
         para_config = np.loadtxt('../data/para_config.csv')
 
         initial_para = para_config[:, 0]
@@ -237,25 +250,26 @@ if __name__ == "__main__":
         done_times_log = []
         filtered_robot_list = []
 
-        exist_folder = '/home/ubuntu/Documents/data_4_meta_self_modeling_id/sign_data/'
-        exist_sign_data = os.listdir(exist_folder)
-        exist_URDF = os.listdir(URDF_PTH)
+        # exist_folder = '/home/ubuntu/Documents/data_4_meta_self_modeling_id/sign_data/'
+        # exist_sign_data = os.listdir(exist_folder)
+        # exist_URDF = os.listdir(URDF_PTH)
 
-        for robotid in range(taskID * num_robots_per_task, (taskID + 1) * num_robots_per_task):
+        for robotid in range(taskID,taskID+1):
             robot_name = robot_list[robotid]
             # robot_name = "11_0_2_0_10_0_9_2_14_0_3_10_13_0_10_0"
+            robot_name = "10_9_9_6_11_9_9_6_13_3_3_6_14_3_3_6"
             print(robotid, robot_name)
             log_pth = data_save_root + "%s/" % robot_name
 
-            if robot_name in exist_sign_data:
-                print('exist!')
-                continue
-            elif robot_name not in exist_URDF:
-                print("URDF folder doesn't contain this robot name", robot_name)
-                continue
-            elif len(os.listdir(URDF_PTH + robot_name)) != 2:
-                print("robot URDF folder doesn't contain this robot txt", os.listdir(URDF_PTH+robot_name))
-                continue
+            # if robot_name in exist_sign_data:
+            #     print('exist!')
+            #     continue
+            # elif robot_name not in exist_URDF:
+            #     print("URDF folder doesn't contain this robot name", robot_name)
+            #     continue
+            # elif len(os.listdir(URDF_PTH + robot_name)) != 2:
+            #     print("robot URDF folder doesn't contain this robot txt", os.listdir(URDF_PTH+robot_name))
+            #     continue
             try:
                 initial_joints_angle = np.loadtxt(URDF_PTH + "%s/%s.txt" % (robot_name, robot_name))
             except:
